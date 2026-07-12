@@ -17,6 +17,6 @@ public class VehicleResourceMixin {
 
         // Передаем "this" напрямую как Object.
         // Миксин скомпилируется без единой ошибки, так как Object есть всегда!
-        DynamicTrainModelLoader.loadInto(dummyJson, (Object) this);
+        DynamicTrainModelLoader.loadObjInto(dummyJson, (Object) this);
     }
 }
