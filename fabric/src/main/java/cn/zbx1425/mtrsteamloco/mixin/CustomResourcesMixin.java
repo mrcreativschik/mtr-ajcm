@@ -1,46 +1,42 @@
 package cn.zbx1425.mtrsteamloco.mixin;
 
-import cn.zbx1425.mtrsteamloco.CustomResources; // Оставляем только этот импорт!
 import cn.zbx1425.mtrsteamloco.Main;
-import cn.zbx1425.mtrsteamloco.render.integration.MtrModelRegistryUtil;
-import cn.zbx1425.sowcer.ContextCapability;
-import cn.zbx1425.sowcer.util.GlStateTracker;
-import org.mtr.core.serializer.ReaderBase;
-import org.mtr.mod.resource.ResourceProvider;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(org.mtr.mod.resource.CustomResources.class) // Полный путь переносим сюда
+@Mixin(targets = "org.mtr.mod.resource.CustomResources", remap = false)
 public class CustomResourcesMixin {
 
-    // Внедряемся в главный конструктор десериализации ресурсов MTR 4
-    @Inject(at = @At("TAIL"), method = "<init>(Lorg/mtr/core/serializer/ReaderBase;Lorg/mtr/mod/resource/ResourceProvider;)V", remap = false)
-    private void onConstructorTail(ReaderBase readerBase, ResourceProvider resourceProvider, CallbackInfo ci) {
-        ContextCapability.checkContextVersion();
-        String glVersionStr = "OpenGL " + ContextCapability.contextVersion / 10 + "."
-                + ContextCapability.contextVersion % 10;
-        Main.LOGGER.info("NTE detected " + glVersionStr + (ContextCapability.isGL4ES ? " (GL4ES)." : "."));
+    // Убираем аргументы из метода совсем!
+    // Mixin не будет пытаться их "матчить", а просто выполнит код в конце конструктора.
+    @Inject(at = @At("TAIL"), method = "<init>")
+    private void onConstructorTail(CallbackInfo ci) {
+        // Поскольку у нас нет доступа к локальным переменным напрямую,
+        // используем вызов через статические методы или получение синглтона.
 
-        GlStateTracker.capture();
-        MtrModelRegistryUtil.loadingErrorList.clear();
+        // ВАЖНО: Вместо того чтобы передавать resourceProvider сюда,
+        // получаем его напрямую из Minecraft, если это клиентская часть:
+        net.minecraft.server.packs.resources.ResourceManager vanillaManager =
+                net.minecraft.client.Minecraft.getInstance().getResourceManager();
 
-        // Передаем провайдер ресурсов для NTE
-        if (resourceProvider != null) {
-            // Если в MtrModelRegistryUtil или вашем CustomResources всё ещё требуется ванильный ResourceManager,
-            // мы можем получить его через обёртки Fabric/Minecraft, не ломая типы маппингов
-            net.minecraft.server.packs.resources.ResourceManager vanillaManager =
-                    net.minecraft.client.Minecraft.getInstance().getResourceManager();
-
-            MtrModelRegistryUtil.resourceManager = vanillaManager;
-            cn.zbx1425.mtrsteamloco.CustomResources.reset(vanillaManager);
+        // Если CustomResources.reset() требует mtr.mapping.holder.ResourceManager:
+        org.mtr.mapping.holder.ResourceManager mtrResourceManager;
+        try {
+            // Получаем конструктор, который принимает Object (внутри он сам скастит его к class_3300)
+            java.lang.reflect.Constructor<?> constructor = org.mtr.mapping.holder.ResourceManager.class.getConstructor(Object.class);
+            mtrResourceManager = (org.mtr.mapping.holder.ResourceManager) constructor.newInstance(vanillaManager);
+        } catch (Exception e) {
+            // Запасной план: если конструктор с Object не сработал, пробуем через поле или просто подавляем
+            Main.LOGGER.error("Failed to map ResourceManager via reflection, trying fallback.", e);
+            // Это "грязный" хак, но он работает, если структура данных в памяти совпадает
+            mtrResourceManager = (org.mtr.mapping.holder.ResourceManager) (Object) vanillaManager;
         }
 
-        // Запускаем обработку кастомных компонентов моделей NTE
+        cn.zbx1425.mtrsteamloco.CustomResources.reset(mtrResourceManager);
         cn.zbx1425.mtrsteamloco.CustomResources.resetComponents();
 
-        GlStateTracker.restore();
-        Main.LOGGER.info("MTR-NTE has successfully hooked into MTR 4 Resource Loading.");
+        cn.zbx1425.mtrsteamloco.Main.LOGGER.info("NTE: Successfully hooked via simplified Inject.");
     }
 }

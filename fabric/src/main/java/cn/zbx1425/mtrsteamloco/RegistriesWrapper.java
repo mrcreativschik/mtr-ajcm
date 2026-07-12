@@ -1,37 +1,34 @@
 package cn.zbx1425.mtrsteamloco;
 
-import mtr.CreativeModeTabs;
-import mtr.RegistryObject;
-import mtr.item.ItemWithCreativeTabBase;
-import net.minecraft.client.KeyMapping;
+// Объекты MTR 4
+import org.mtr.mapping.registry.BlockRegistryObject;
+import org.mtr.mapping.registry.ItemRegistryObject;
+import org.mtr.mapping.registry.BlockEntityTypeRegistryObject;
+import org.mtr.mapping.registry.EntityTypeRegistryObject;
+import org.mtr.mapping.registry.CreativeModeTabHolder;
+import org.mtr.mapping.holder.SoundEvent;
+
+// Ванильные частицы (так как MTR 4 их не оборачивает)
 import net.minecraft.core.particles.ParticleType;
 import net.minecraft.core.particles.SimpleParticleType;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.sounds.SoundEvent;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.item.CreativeModeTab;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.BlockEntityType;
 
 public interface RegistriesWrapper {
 
-    void registerBlock(String id, RegistryObject<Block> block);
+    void registerBlock(String id, BlockRegistryObject block);
 
-    void registerItem(String id, RegistryObject<ItemWithCreativeTabBase> item);
+    // Заменили Wrapper на CreativeModeTabHolder
+    void registerBlockAndItem(String id, BlockRegistryObject block, CreativeModeTabHolder tab);
 
-    void registerBlockAndItem(String id, RegistryObject<Block> block, CreativeModeTabs.Wrapper tab);
+    void registerItem(String id, ItemRegistryObject item);
 
-    void registerBlockEntityType(String id, RegistryObject<? extends BlockEntityType<? extends BlockEntity>> blockEntityType);
+    void registerBlockEntityType(String id, BlockEntityTypeRegistryObject blockEntityType);
 
-    void registerEntityType(String id, RegistryObject<? extends EntityType<? extends Entity>> entityType);
+    void registerEntityType(String id, EntityTypeRegistryObject entityType);
 
     void registerSoundEvent(String id, SoundEvent soundEvent);
 
+    // Ванильные частицы
     void registerParticleType(String id, ParticleType<?> particleType);
 
     SimpleParticleType createParticleType(boolean overrideLimiter);
-
 }

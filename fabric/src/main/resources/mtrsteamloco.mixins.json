@@ -24,8 +24,7 @@
     "TrainAccessor",
     "TrainClientAccessor",
     "TrainClientMixin",
-    "TrainClientRegistryMixin",
-    "GLFWMixin"
+    "TrainClientRegistryMixin"
   ],
   "injectors": {
     "defaultRequire": 1

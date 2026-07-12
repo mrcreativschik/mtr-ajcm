@@ -1,92 +1,87 @@
 package cn.zbx1425.mtrsteamloco.fabric;
 
-import cn.zbx1425.mtrsteamloco.mappings.FabricRegistryUtilities;
-import net.fabricmc.fabric.api.particle.v1.FabricParticleTypes;
-import mtr.CreativeModeTabs;
-import mtr.RegistryObject;
-import mtr.item.ItemWithCreativeTabBase;
 import cn.zbx1425.mtrsteamloco.Main;
 import cn.zbx1425.mtrsteamloco.RegistriesWrapper;
-import mtr.mappings.RegistryUtilities;
-import net.minecraft.core.particles.SimpleParticleType;
-import net.minecraft.client.KeyMapping;
-import net.minecraft.core.Registry;
-import net.minecraft.core.particles.ParticleType;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.sounds.SoundEvent;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.CreativeModeTab;
-import net.minecraft.world.item.Item;
-import mtr.mappings.Text;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.ItemStack;
-import java.util.List;
-import java.util.function.Supplier;
 
+// Импорты MTR 4
+import org.mtr.mapping.registry.BlockRegistryObject;
+import org.mtr.mapping.registry.ItemRegistryObject;
+import org.mtr.mapping.registry.BlockEntityTypeRegistryObject;
+import org.mtr.mapping.registry.EntityTypeRegistryObject;
+import org.mtr.mapping.registry.CreativeModeTabHolder;
+import org.mtr.mapping.holder.SoundEvent;
+
+// Ванильные регистраторы Minecraft / Fabric
+import net.fabricmc.fabric.api.particle.v1.FabricParticleTypes;
+import net.minecraft.core.Registry;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.core.particles.ParticleType;
+import net.minecraft.core.particles.SimpleParticleType;
+
+import java.lang.reflect.Field;
+
+@SuppressWarnings("unchecked")
 public class RegistriesWrapperImpl implements RegistriesWrapper {
 
-#if MC_VERSION >= "12000"
-    @Override
-    public void registerCreativeModeTab(String id, CreativeModeTab creativeModeTab) {
-        net.minecraft.core.Registry.register(net.minecraft.core.registries.BuiltInRegistries.CREATIVE_MODE_TAB, new ResourceLocation(Main.MOD_ID, id), creativeModeTab);
-    }
-#endif
-
-    @Override
-    public void registerBlock(String id, RegistryObject<Block> block) {
-        Registry.register(RegistryUtilities.registryGetBlock(), new ResourceLocation(Main.MOD_ID, id), block.get());
-    }
-
-    @Override
-    public void registerBlockAndItem(String id, RegistryObject<Block> block, CreativeModeTabs.Wrapper tab) {
-        Registry.register(RegistryUtilities.registryGetBlock(), new ResourceLocation(Main.MOD_ID, id), block.get());
-        final BlockItem blockItem = new BlockItem(block.get(), RegistryUtilities.createItemProperties(tab::get));
-        Registry.register(RegistryUtilities.registryGetItem(), new ResourceLocation(Main.MOD_ID, id), blockItem);
-        FabricRegistryUtilities.registerCreativeModeTab(tab.get(), blockItem);
+    // Достаем поле "data" через рефлексию, полностью скрывая типы от компилятора Loom
+    private static <T> T getInternalData(Object holder) {
+        try {
+            Field field = holder.getClass().getField("data");
+            field.setAccessible(true);
+            return (T) field.get(holder);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to extract vanilla object from MTR holder: " + holder, e);
+        }
     }
 
     @Override
-    public void registerItem(String id, RegistryObject<ItemWithCreativeTabBase> item) {
-        Registry.register(RegistryUtilities.registryGetItem(), new ResourceLocation(Main.MOD_ID, id), item.get());
-        FabricRegistryUtilities.registerCreativeModeTab(item.get().creativeModeTab.get(), item.get());
+    public void registerBlock(String id, BlockRegistryObject block) {
+        Block vanillaBlock = getInternalData(block.get());
+        Registry.register(BuiltInRegistries.BLOCK, new ResourceLocation(Main.MOD_ID, id), vanillaBlock);
     }
 
     @Override
-    public void registerItem(String id, RegistryObject<Item> item, CreativeModeTabs.Wrapper creativeModeTab) {
-        Registry.register(RegistryUtilities.registryGetItem(), new ResourceLocation(Main.MOD_ID, id), item.get());
-        FabricRegistryUtilities.registerCreativeModeTab(creativeModeTab.get(), item.get());
+    public void registerBlockAndItem(String id, BlockRegistryObject block, CreativeModeTabHolder tab) {
+        Block vanillaBlock = getInternalData(block.get());
+        Registry.register(BuiltInRegistries.BLOCK, new ResourceLocation(Main.MOD_ID, id), vanillaBlock);
+
+        BlockItem blockItem = new BlockItem(vanillaBlock, new Item.Properties());
+        Registry.register(BuiltInRegistries.ITEM, new ResourceLocation(Main.MOD_ID, id), blockItem);
     }
 
     @Override
-    public void registerItem(String id, RegistryObject<Item> item, CreativeModeTab creativeModeTab) {
-        Registry.register(RegistryUtilities.registryGetItem(), new ResourceLocation(Main.MOD_ID, id), item.get());
-        FabricRegistryUtilities.registerCreativeModeTab(creativeModeTab, item.get());
+    public void registerItem(String id, ItemRegistryObject item) {
+        Item vanillaItem = getInternalData(item.get());
+        Registry.register(BuiltInRegistries.ITEM, new ResourceLocation(Main.MOD_ID, id), vanillaItem);
     }
 
     @Override
-    public void registerBlockEntityType(String id, RegistryObject<? extends BlockEntityType<? extends BlockEntity>> blockEntityType) {
-        Registry.register(RegistryUtilities.registryGetBlockEntityType(), new ResourceLocation(Main.MOD_ID, id), blockEntityType.get());
+    public void registerBlockEntityType(String id, BlockEntityTypeRegistryObject blockEntityType) {
+        BlockEntityType<?> vanillaType = getInternalData(blockEntityType.get());
+        Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, new ResourceLocation(Main.MOD_ID, id), vanillaType);
     }
 
     @Override
-    public void registerEntityType(String id, RegistryObject<? extends EntityType<? extends Entity>> entityType) {
-        Registry.register(RegistryUtilities.registryGetEntityType(), new ResourceLocation(Main.MOD_ID, id), entityType.get());
+    public void registerEntityType(String id, EntityTypeRegistryObject entityType) {
+        EntityType<?> vanillaType = getInternalData(entityType.get());
+        Registry.register(BuiltInRegistries.ENTITY_TYPE, new ResourceLocation(Main.MOD_ID, id), vanillaType);
     }
 
     @Override
     public void registerSoundEvent(String id, SoundEvent soundEvent) {
-        Registry.register(RegistryUtilities.registryGetSoundEvent(), new ResourceLocation(Main.MOD_ID, id), soundEvent);
+        net.minecraft.sounds.SoundEvent vanillaSound = getInternalData(soundEvent);
+        Registry.register(BuiltInRegistries.SOUND_EVENT, new ResourceLocation(Main.MOD_ID, id), vanillaSound);
     }
 
     @Override
     public void registerParticleType(String id, ParticleType<?> particleType) {
-        Registry.register(RegistryUtilities.registryGetParticleType(), new ResourceLocation(Main.MOD_ID, id), particleType);
+        Registry.register(BuiltInRegistries.PARTICLE_TYPE, new ResourceLocation(Main.MOD_ID, id), particleType);
     }
 
     @Override

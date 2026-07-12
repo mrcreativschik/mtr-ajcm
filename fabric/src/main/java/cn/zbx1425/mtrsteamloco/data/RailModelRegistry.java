@@ -3,21 +3,14 @@ package cn.zbx1425.mtrsteamloco.data;
 import cn.zbx1425.mtrsteamloco.Main;
 import cn.zbx1425.mtrsteamloco.MainClient;
 import cn.zbx1425.mtrsteamloco.render.integration.MtrModelRegistryUtil;
-import cn.zbx1425.sowcer.math.Vector3f;
-import cn.zbx1425.sowcer.model.Model;
-import cn.zbx1425.sowcerext.model.ModelCluster;
-import cn.zbx1425.sowcerext.model.RawModel;
-import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.datafixers.util.Pair;
-import mtr.mappings.Text;
-import mtr.mappings.Utilities;
-import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.network.chat.Component;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
 
@@ -33,7 +26,8 @@ public class RailModelRegistry {
 
     public static Map<String, RailModelProperties> elements = new HashMap<>();
 
-    public static ModelCluster railNodeModel;
+    // Вместо ModelCluster используем стандартный ResourceLocation для ноды рельса
+    public static ResourceLocation railNodeModelLocation;
 
     public static void register(String key, RailModelProperties properties) {
         elements.put(key, properties);
@@ -42,25 +36,18 @@ public class RailModelRegistry {
     public static void reload(ResourceManager resourceManager) {
         elements.clear();
 
-        //
-        register("", new RailModelProperties(Text.translatable("rail.mtrsteamloco.default"), null, 1f, 0f));
-        // This is pulled from registry and shouldn't be shown
-        register("null", new RailModelProperties(Text.translatable("rail.mtrsteamloco.hidden"), null, Float.MAX_VALUE, 0f));
+        // Используем Component вместо Text
+        register("", new RailModelProperties(Component.translatable("rail.mtrsteamloco.default"), null, 1f, 0f));
+        register("null", new RailModelProperties(Component.translatable("rail.mtrsteamloco.hidden"), null, Float.MAX_VALUE, 0f));
 
-        try {
-            RawModel railNodeRawModel = MainClient.modelManager.loadRawModel(resourceManager,
-                    new ResourceLocation("mtrsteamloco:models/rail_node.csv"), MainClient.atlasManager);
-            railNodeModel = MainClient.modelManager.uploadVertArrays(railNodeRawModel);
-        } catch (Exception ex) {
-            Main.LOGGER.error("Failed loading rail node model", ex);
-            MtrModelRegistryUtil.recordLoadingError("Failed loading Rail Node", ex);
-        }
+        railNodeModelLocation = new ResourceLocation("mtrsteamloco:models/rail_node.csv");
 
         List<Pair<ResourceLocation, Resource>> resources =
                 MtrModelRegistryUtil.listResources(resourceManager, "mtrsteamloco", "rails", ".json");
         for (Pair<ResourceLocation, Resource> pair : resources) {
             try {
-                try (InputStream is = Utilities.getInputStream(pair.getSecond())) {
+                // Заменили Utilities.getInputStream на pair.getSecond().open()
+                try (InputStream is = pair.getSecond().open()) {
                     JsonObject rootObj = (new JsonParser()).parse(IOUtils.toString(is, StandardCharsets.UTF_8)).getAsJsonObject();
                     if (rootObj.has("model")) {
                         String key = FilenameUtils.getBaseName(pair.getFirst().getPath());
@@ -79,11 +66,14 @@ public class RailModelRegistry {
             }
         }
 
-        MainClient.railRenderDispatcher.clearRail();
+        if (MainClient.railRenderDispatcher != null) {
+            MainClient.railRenderDispatcher.clearRail();
+        }
     }
 
+    // Заменили Text.literal на Component.literal
     private static final RailModelProperties EMPTY_PROPERTY = new RailModelProperties(
-            Text.literal(""), null, 1f, 0
+            Component.literal(""), null, 1f, 0f
     );
 
     public static RailModelProperties getProperty(String key) {
@@ -91,27 +81,13 @@ public class RailModelRegistry {
     }
 
     private static RailModelProperties loadFromJson(ResourceManager resourceManager, String key, JsonObject obj) throws IOException {
-        if (obj.has("atlasIndex")) {
-            MainClient.atlasManager.load(
-                    MtrModelRegistryUtil.resourceManager,  new ResourceLocation(obj.get("atlasIndex").getAsString())
-            );
-        }
-
-        RawModel rawModel = MainClient.modelManager.loadRawModel(resourceManager,
-                new ResourceLocation(obj.get("model").getAsString()), MainClient.atlasManager).copy();
-
-        if (obj.has("textureId")) {
-            rawModel.replaceTexture("default.png", new ResourceLocation(obj.get("textureId").getAsString()));
-        }
-        if (obj.has("flipV") && obj.get("flipV").getAsBoolean()) {
-            rawModel.applyUVMirror(false, true);
-        }
-
-        rawModel.sourceLocation = new ResourceLocation(rawModel.sourceLocation.toString() + "/" + key);
+        // Вытаскиваем путь к модели текстом из JSON
+        String modelPath = obj.has("model") ? obj.get("model").getAsString() : "";
 
         float repeatInterval = obj.has("repeatInterval") ? obj.get("repeatInterval").getAsFloat() : 0.5f;
         float yOffset = obj.has("yOffset") ? obj.get("yOffset").getAsFloat() : 0f;
 
-        return new RailModelProperties(Text.translatable(obj.get("name").getAsString()), rawModel, repeatInterval, yOffset);
+        // Создаем свойства рельса, передавая строку пути напрямую
+        return new RailModelProperties(Component.translatable(obj.get("name").getAsString()), modelPath, repeatInterval, yOffset);
     }
 }

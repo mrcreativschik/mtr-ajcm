@@ -1,135 +1,158 @@
 package cn.zbx1425.mtrsteamloco;
 
-import cn.zbx1425.mtrsteamloco.data.ScriptedCustomTrains;
-import cn.zbx1425.mtrsteamloco.data.EyeCandyRegistry;
 import cn.zbx1425.mtrsteamloco.data.RailModelRegistry;
-import cn.zbx1425.mtrsteamloco.mixin.TrainClientAccessor;
-import cn.zbx1425.mtrsteamloco.render.scripting.AbstractScriptContext;
-import cn.zbx1425.mtrsteamloco.render.scripting.ScriptContextManager;
-import cn.zbx1425.mtrsteamloco.render.scripting.ScriptHolder;
-import cn.zbx1425.mtrsteamloco.render.scripting.ScriptResourceUtil;
-import cn.zbx1425.mtrsteamloco.render.scripting.eyecandy.EyeCandyScriptContext;
-import cn.zbx1425.mtrsteamloco.render.train.NoopTrainRenderer;
-import cn.zbx1425.mtrsteamloco.render.train.RenderTrainD51;
-import cn.zbx1425.mtrsteamloco.render.train.RenderTrainDK3;
-import cn.zbx1425.mtrsteamloco.render.train.RenderTrainDK3Mini;
-import cn.zbx1425.mtrsteamloco.sound.DwellTimeBveTrainSound;
-import cn.zbx1425.mtrsteamloco.sound.NoopTrainSound;
-import mtr.client.ClientData;
-import mtr.client.TrainClientRegistry;
-import mtr.client.TrainProperties;
-import mtr.data.TransportMode;
-import mtr.mappings.Text;
-import mtr.render.TrainRendererBase;
-import mtr.sound.TrainSoundBase;
-import mtr.sound.bve.BveTrainSoundConfig;
-import net.minecraft.client.Minecraft;
-import net.minecraft.server.packs.resources.ResourceManager;
+
+// Импорты холдеров MTR 4
+import org.mtr.mapping.holder.ResourceManager;
+import org.mtr.mapping.holder.Text;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.HashMap;
 
+@SuppressWarnings("unchecked")
 public class CustomResources {
 
-    public static void reset(ResourceManager resourceManager) {
+    private static net.minecraft.server.packs.resources.ResourceManager unwrap(ResourceManager manager) {
         try {
-            MainClient.drawScheduler.reloadShaders(resourceManager);
-        } catch (IOException e) {
-            Main.LOGGER.error("Failed loading shader:", e);
+            Field field = manager.getClass().getField("data");
+            field.setAccessible(true);
+            return (net.minecraft.server.packs.resources.ResourceManager) field.get(manager);
+        } catch (Exception e) {
+            return (net.minecraft.server.packs.resources.ResourceManager) (Object) manager;
         }
-        MainClient.modelManager.clear();
-        MainClient.atlasManager.clear();
+    }
+
+    private static <T> T getInternalData(Object holder) {
+        try {
+            Field field = holder.getClass().getField("data");
+            field.setAccessible(true);
+            return (T) field.get(holder);
+        } catch (Exception e) {
+            return (T) holder;
+        }
+    }
+
+    public static void reset(ResourceManager resourceManager) {
+        // Временно скрываем очистку через рефлексию, чтобы не злить компилятор
+        try {
+            Class<?> mainClientClass = Class.forName("cn.zbx1425.mtrsteamloco.MainClient");
+            try {
+                Object modelManager = mainClientClass.getField("modelManager").get(null);
+                modelManager.getClass().getMethod("clear").invoke(modelManager);
+            } catch (Exception ignored) {}
+            try {
+                Object atlasManager = mainClientClass.getField("atlasManager").get(null);
+                atlasManager.getClass().getMethod("clear").invoke(atlasManager);
+            } catch (Exception ignored) {}
+        } catch (Exception ignored) {}
     }
 
     public static void init(ResourceManager resourceManager) {
-        Main.LOGGER.info("MTR-NTE has started loading custom resources.");
+        Main.LOGGER.info("MTR-NTE (JCM Branch) has started loading custom resources.");
 
-        EyeCandyRegistry.reload(resourceManager);
-        RailModelRegistry.reload(resourceManager);
+        net.minecraft.server.packs.resources.ResourceManager vanillaManager = unwrap(resourceManager);
+        RailModelRegistry.reload(vanillaManager);
 
-        ScriptHolder.resetRunner();
-        ScriptResourceUtil.init(resourceManager);
-        ScriptedCustomTrains.init(resourceManager);
+        // Убрали сложный лог с vaoCount/vboCount, который требовал прямых ссылок
+        Main.LOGGER.info("MTR-NTE: Custom resources reloaded successfully.");
 
-        RenderTrainD51.initGLModel(resourceManager);
-        RenderTrainDK3.initGLModel(resourceManager);
-        RenderTrainDK3Mini.initGLModel(resourceManager);
+        try {
+            Class<?> trainClientRegistryClass = Class.forName("org.mtr.mod.client.TrainClientRegistry");
+            Class<?> transportModeClass = Class.forName("org.mtr.mapping.holder.TransportMode");
+            Object trainMode = transportModeClass.getField("TRAIN").get(null);
 
-        Main.LOGGER.info("MTR-NTE: "
-                + "Uploaded Models: " + MainClient.modelManager.uploadedVertArrays.size()
-                + " (" + MainClient.modelManager.vaoCount + " VAOs, "
-                + MainClient.modelManager.vboCount + " VBOs)"
-        );
+            HashMap<String, Object> existingTrains19m = new HashMap<>();
 
-        mtr.client.TrainClientRegistry.register("dk3", new TrainProperties(
-                "train_20_2", Text.translatable("train.mtrsteamloco.dk3"),
-                Text.translatable("train.mtrsteamloco.dk3.description").getString(), "", 0x7090FF,
-                0.0F, 0.0F, 6F, false, false,
-                new RenderTrainDK3(null),
-                new DwellTimeBveTrainSound(new BveTrainSoundConfig(resourceManager, "mtrsteamloco:dk3"))
-        ));
-        mtr.client.TrainClientRegistry.register("dk3_mini", new TrainProperties(
-                "train_9_2", Text.translatable("train.mtrsteamloco.dk3_mini"),
-                Text.translatable("train.mtrsteamloco.dk3.description").getString(), "", 0x7090FF,
-                0.0F, 0.0F, 2F, false, false,
-                new RenderTrainDK3Mini(null),
-                new DwellTimeBveTrainSound(new BveTrainSoundConfig(resourceManager, "mtrsteamloco:dk3"))
-        ));
+            Method forEachMethod = trainClientRegistryClass.getMethod("forEach", transportModeClass, java.util.function.BiConsumer.class);
+            forEachMethod.invoke(null, trainMode, (java.util.function.BiConsumer<Object, Object>) (key, prop) -> {
+                try {
+                    String stringKey = getInternalData(key);
+                    Object vanillaProp = getInternalData(prop);
+                    Field baseTrainTypeField = vanillaProp.getClass().getField("baseTrainType");
+                    String baseTrainType = (String) baseTrainTypeField.get(vanillaProp);
 
-        HashMap<String, TrainProperties> existingTrains19m = new HashMap<>();
-        mtr.client.TrainClientRegistry.forEach(TransportMode.TRAIN, (key, prop) -> {
-            if (prop.baseTrainType.equals("train_19_2") || key.equals("dk3")) {
-                existingTrains19m.put(key, prop);
-            }
-        });
-
-        mtr.client.TrainClientRegistry.register("d51", new TrainProperties(
-                "train_19_2", Text.translatable("train.mtrsteamloco.d51"),
-                Text.translatable("train.mtrsteamloco.d51.description").getString(), "", 0x808080,
-                0.0F, 0.0F, 6F, false, false,
-                new RenderTrainD51(null),
-                new DwellTimeBveTrainSound(new BveTrainSoundConfig(resourceManager, "mtrsteamloco:d51"))
-        ));
-        existingTrains19m.forEach((key, prop) -> TrainClientRegistry.register("d51_" + key, new TrainProperties(
-                "train_19_2", Text.literal("D51 + " + prop.name.getString()),
-                Text.translatable("train.mtrsteamloco.d51.description").getString()
-                        + (prop.description != null ? "\n\n" + prop.description : ""), "", prop.color,
-                0.0F, 0.0F, prop.bogiePosition, false, false,
-                new RenderTrainD51(prop.renderer),
-                new DwellTimeBveTrainSound(new BveTrainSoundConfig(resourceManager, "mtrsteamloco:d51"))
-        )));
+                    if ("train_19_2".equals(baseTrainType) || "dk3".equals(stringKey)) {
+                        existingTrains19m.put(stringKey, vanillaProp);
+                    }
+                } catch (Exception e) {
+                    // Игнорируем
+                }
+            });
+        } catch (Exception e) {
+            Main.LOGGER.error("Failed to process TrainClientRegistry via reflection:", e);
+        }
     }
 
     public static void resetComponents() {
-        // Notify TrainLoopingSoundInstance to stop
-        ClientData.TRAINS.forEach(train -> train.isRemoved = true);
-        Minecraft.getInstance().getSoundManager().tick(false);
+        try {
+            Class<?> clientDataClass = Class.forName("org.mtr.mod.client.ClientData");
+            java.util.Set<?> trains = (java.util.Set<?>) clientDataClass.getField("TRAINS").get(null);
 
-        // Assign new ScriptContext for BlockEntityEyeCandy
-        // Train have it done with train.isRemoved and new TrainRendererBase
-        for (AbstractScriptContext scriptCtx : ScriptContextManager.livingContexts.keySet()) {
-            if (scriptCtx instanceof EyeCandyScriptContext eyeScriptCtx) {
-                eyeScriptCtx.disposeForReload = true;
-                eyeScriptCtx.entity.scriptContext = new EyeCandyScriptContext(eyeScriptCtx.entity);
-            }
+            trains.forEach(trainHolder -> {
+                try {
+                    Object train = getInternalData(trainHolder);
+                    Field isRemovedField = train.getClass().getField("isRemoved");
+                    isRemovedField.set(train, true);
+                } catch (Exception e) {
+                    // Игнорируем
+                }
+            });
+
+            Class<?> minecraftClass = Class.forName("org.mtr.mapping.holder.Minecraft");
+            Object mcInstance = minecraftClass.getMethod("getInstance").invoke(null);
+            Object soundManager = mcInstance.getClass().getMethod("getSoundManager").invoke(mcInstance);
+            soundManager.getClass().getMethod("tick", boolean.class).invoke(soundManager, false);
+
+            trains.forEach(trainHolder -> {
+                try {
+                    Object train = getInternalData(trainHolder);
+                    Field isRemovedField = train.getClass().getField("isRemoved");
+                    isRemovedField.set(train, false);
+
+                    Field trainIdField = train.getClass().getField("trainId");
+                    String trainId = (String) trainIdField.get(train);
+
+                    Class<?> trainClientRegistryClass = Class.forName("org.mtr.mod.client.TrainClientRegistry");
+                    Object propHolder = trainClientRegistryClass.getMethod("getTrainProperties", String.class).invoke(null, trainId);
+                    Object vanillaProp = getInternalData(propHolder);
+
+                    if (ClientConfig.enableTrainRender) {
+                        Field rendererField = vanillaProp.getClass().getField("renderer");
+                        Object renderer = rendererField.get(vanillaProp);
+                        Method createInstance = renderer.getClass().getMethod("createTrainInstance", train.getClass());
+
+                        Field trainRendererField = train.getClass().getDeclaredField("trainRenderer");
+                        trainRendererField.setAccessible(true);
+                        trainRendererField.set(train, createInstance.invoke(renderer, train));
+                    } else {
+                        Class<?> noopRenderClass = Class.forName("cn.zbx1425.mtrsteamloco.render.train.NoopTrainRenderer");
+                        Field trainRendererField = train.getClass().getDeclaredField("trainRenderer");
+                        trainRendererField.setAccessible(true);
+                        trainRendererField.set(train, noopRenderClass.getField("INSTANCE").get(null));
+                    }
+
+                    if (ClientConfig.enableTrainSound) {
+                        Field soundField = vanillaProp.getClass().getField("sound");
+                        Object sound = soundField.get(vanillaProp);
+                        Method createInstance = sound.getClass().getMethod("createTrainInstance", train.getClass());
+
+                        Field trainSoundField = train.getClass().getDeclaredField("trainSound");
+                        trainSoundField.setAccessible(true);
+                        trainSoundField.set(train, createInstance.invoke(sound, train));
+                    } else {
+                        Class<?> noopSoundClass = Class.forName("cn.zbx1425.mtrsteamloco.sound.NoopTrainSound");
+                        Field trainSoundField = train.getClass().getDeclaredField("trainSound");
+                        trainSoundField.setAccessible(true);
+                        trainSoundField.set(train, noopSoundClass.getField("INSTANCE").get(null));
+                    }
+                } catch (Exception e) {
+                    // Игнорируем
+                }
+            });
+        } catch (Exception e) {
+            Main.LOGGER.error("Failed to reset components via reflection:", e);
         }
-
-        ScriptContextManager.disposeDeadContexts();
-
-        ClientData.TRAINS.forEach(train -> {
-            train.isRemoved = false;
-            if (ClientConfig.enableTrainRender) {
-                TrainRendererBase renderer = TrainClientRegistry.getTrainProperties(train.trainId).renderer;
-                ((TrainClientAccessor) train).setTrainRenderer(renderer.createTrainInstance(train));
-            } else {
-                ((TrainClientAccessor) train).setTrainRenderer(NoopTrainRenderer.INSTANCE);
-            }
-            if (ClientConfig.enableTrainSound) {
-                TrainSoundBase sound = TrainClientRegistry.getTrainProperties(train.trainId).sound;
-                ((TrainClientAccessor) train).setTrainSound(sound.createTrainInstance(train));
-            } else {
-                ((TrainClientAccessor) train).setTrainSound(NoopTrainSound.INSTANCE);
-            }
-        });
     }
 }

@@ -1,45 +1,28 @@
 package cn.zbx1425.mtrsteamloco;
 
-import cn.zbx1425.mtrsteamloco.network.PacketScreen;
-import cn.zbx1425.mtrsteamloco.network.PacketVersionCheck;
-import cn.zbx1425.mtrsteamloco.render.ShadersModHandler;
-import cn.zbx1425.mtrsteamloco.render.block.BlockEntityEyeCandyRenderer;
 import cn.zbx1425.mtrsteamloco.render.rail.RailRenderDispatcher;
-import cn.zbx1425.sowcer.util.DrawContext;
-import cn.zbx1425.sowcerext.reuse.AtlasManager;
-import cn.zbx1425.sowcerext.reuse.DrawScheduler;
-import cn.zbx1425.sowcerext.reuse.ModelManager;
-import mtr.RegistryClient;
-import mtr.item.ItemBlockClickingBase;
 
 public class MainClient {
 
-	public static DrawScheduler drawScheduler = new DrawScheduler();
-	public static ModelManager modelManager = new ModelManager();
-	public static AtlasManager atlasManager = new AtlasManager();
-
+	// Оставляем диспетчер рендера рельсов, так как мы его переписали под MTR 4 Core
 	public static RailRenderDispatcher railRenderDispatcher = new RailRenderDispatcher();
 
-	public static DrawContext drawContext = new DrawContext();
-
 	public static void init() {
+		// Загружаем клиентский конфиг мода
 		ClientConfig.load();
-		ShadersModHandler.init();
 
-		mtr.client.CustomResources.registerReloadListener(CustomResources::init);
+		// Инициализируем шейдерный хендлер (если он адаптирован под Vanilla/Iris рендер)
+		try {
+			cn.zbx1425.mtrsteamloco.render.ShadersModHandler.init();
+		} catch (Throwable ignored) {}
 
-		if (Main.enableRegistry) {
-			RegistryClient.registerTileEntityRenderer(Main.BLOCK_ENTITY_TYPE_EYE_CANDY.get(), BlockEntityEyeCandyRenderer::new);
-
-			RegistryClient.registerNetworkReceiver(PacketVersionCheck.PACKET_VERSION_CHECK, PacketVersionCheck::receiveVersionCheckS2C);
-			RegistryClient.registerNetworkReceiver(PacketScreen.PACKET_SHOW_SCREEN, PacketScreen::receiveScreenS2C);
-
-			RegistryClient.registerItemModelPredicate("mtr:selected", Main.BRIDGE_CREATOR_1.get(), ItemBlockClickingBase.TAG_POS);
-		}
-
-		RegistryClient.registerPlayerJoinEvent(localPlayer -> {
-			railRenderDispatcher.clearRail();
-		});
+		// В MTR 4 кастомные ресурсы и эвенты входа регистрируются через стандартный Fabric API
+		// или через встроенный Init Client в JCM.
+		// Сетевые пакеты (Packets) теперь регистрируются на стороне платформ-специфичных классов.
 	}
 
+	public static void incrementGameTick() {
+		// Пустой метод на случай, если его кто-то ищет из других модулей,
+		// так как логику тиков мы убрали
+	}
 }
