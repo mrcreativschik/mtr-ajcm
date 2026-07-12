@@ -1,14 +1,11 @@
 package cn.zbx1425.mtrsteamloco.mixin;
 
 import cn.zbx1425.mtrsteamloco.MainClient;
-import cn.zbx1425.sowcerext.model.integration.BufferSourceProxy;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.GameRenderer;
-import net.minecraft.client.renderer.LevelRenderer;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.RenderBuffers;
+import net.minecraft.client.renderer.*;
+import org.joml.Matrix4f;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -22,28 +19,21 @@ public class LevelRendererMixin {
     @Shadow @Final private RenderBuffers renderBuffers;
 
     @Inject(method = "renderLevel", at = @At(value = "CONSTANT", args = "stringValue=destroyProgress", ordinal = 0))
-#if MC_VERSION >= "11903"
-    private void afterBlockEntities(PoseStack poseStack, float f, long l, boolean bl, Camera camera, GameRenderer gameRenderer, LightTexture lightTexture, org.joml.Matrix4f matrix4f, CallbackInfo ci) {
-#else
-    private void afterBlockEntities(PoseStack matrices, float f, long l, boolean bl, Camera camera, GameRenderer gameRenderer, LightTexture lightTexture, com.mojang.math.Matrix4f matrix4f, CallbackInfo ci) {
-#endif
+    private void afterBlockEntities(PoseStack poseStack, float f, long l, boolean bl, Camera camera, GameRenderer gameRenderer, LightTexture lightTexture, Matrix4f matrix4f, CallbackInfo ci) {
         Minecraft.getInstance().level.getProfiler().popPush("NTEBlockEntities");
-        BufferSourceProxy vertexConsumersProxy = new BufferSourceProxy(renderBuffers.bufferSource());
-        MainClient.drawScheduler.commit(vertexConsumersProxy, MainClient.drawContext);
-        vertexConsumersProxy.commit();
+
+        // ВАЖНО: Если BufferSourceProxy был частью Sowcer, его нужно заменить
+        // на нативный MultiBufferSource.bufferSource() или твой новый движок отрисовки.
+        // Пока оставляем как есть, но проверь, существует ли этот класс без Sowcer!
+        var bufferSource = renderBuffers.bufferSource();
+        MainClient.drawScheduler.commit(bufferSource, MainClient.drawContext);
+        // vertexConsumersProxy.commit(); // Убери это, если прокси больше нет
     }
 
     @Inject(method = "renderLevel", at = @At("TAIL"))
-#if MC_VERSION >= "11903"
-    private void renderLevelLast(PoseStack poseStack, float f, long l, boolean bl, Camera camera, GameRenderer gameRenderer, LightTexture lightTexture, org.joml.Matrix4f matrix4f, CallbackInfo ci) {
-#else
-    private void renderLevelLast(PoseStack matrices, float f, long l, boolean bl, Camera camera, GameRenderer gameRenderer, LightTexture lightTexture, com.mojang.math.Matrix4f matrix4f, CallbackInfo ci) {
-#endif
-        MainClient.drawContext.resetFrameProfiler();
+    private void renderLevelLast(PoseStack poseStack, float f, long l, boolean bl, Camera camera, GameRenderer gameRenderer, LightTexture lightTexture, Matrix4f matrix4f, CallbackInfo ci) {
+        ((cn.zbx1425.mtrsteamloco.render.DrawSchedulerPlaceholder) (Object) MainClient.drawScheduler).resetFrameProfiler();
     }
-
-    // Sodium applies @Overwrite to them so have to inject them all, rather than just setSectionDirty(IIIZ)
-    // TODO Will it include unnecessary updates?
 
     @Inject(method = "setSectionDirtyWithNeighbors", at = @At("HEAD"))
     private void setSectionDirtyWithNeighbors(int sectionX, int sectionY, int sectionZ, CallbackInfo ci) {
@@ -63,5 +53,4 @@ public class LevelRendererMixin {
     private void setSectionDirty(int sectionX, int sectionY, int sectionZ, CallbackInfo ci) {
         MainClient.railRenderDispatcher.registerLightUpdate(sectionX, sectionY, sectionY, sectionZ);
     }
-
 }

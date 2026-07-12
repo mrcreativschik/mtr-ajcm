@@ -13,7 +13,6 @@
     "KeyboardHandlerMixin",
     "LevelRendererAccessor",
     "LevelRendererMixin",
-    "ModelMapperAccessor",
     "ModelPartAccessor",
     "ModelSimpleTrainBaseAccessor",
     "NativeImageAccessor",
