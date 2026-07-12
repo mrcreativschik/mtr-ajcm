@@ -2,27 +2,13 @@ package cn.zbx1425.sowcer.math;
 
 import java.util.Stack;
 
-public class Matrices implements Posture {
+public class Matrices {
 
 
     private final Stack<Matrix4f> stack = new Stack<>();
 
     public Matrices() {
         stack.push(new Matrix4f());
-    }
-
-    public Matrices(Matrix4f matrix) {
-        stack.push(matrix.copy());
-    }
-
-    public Matrices(Matrices matrices) {
-        for (Matrix4f matrix : matrices.stack) {
-            stack.push(matrix.copy());
-        }
-    }
-
-    public Matrices copy() {
-        return new Matrices(this);
     }
 
     public void translate(double x, double y, double z) {
@@ -73,30 +59,5 @@ public class Matrices implements Posture {
     public void setIdentity() {
         stack.pop();
         stack.push(new Matrix4f());
-    }
-
-    @Override
-    public PoseStack getAsPoseStack() {
-        return new PoseStack(getAsPose());
-    }
-
-    @Override
-    public Pose getAsPose() {
-        return new Pose(last());
-    }
-
-    @Override
-    public Matrix4f getAsMatrix4f() {
-        return last();
-    }
-
-    @Override
-    public Matrix3f getAsMatrix3f() {
-        return new Matrix3f(last());
-    }
-
-    @Override
-    public Matrices getAsMatrices() {
-        return this;
     }
 }

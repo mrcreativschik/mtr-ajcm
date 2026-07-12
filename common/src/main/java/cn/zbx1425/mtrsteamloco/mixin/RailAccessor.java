@@ -1,7 +1,6 @@
 package cn.zbx1425.mtrsteamloco.mixin;
 
 import mtr.data.Rail;
-import mtr.data.RailAngle;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
@@ -24,6 +23,4 @@ public interface RailAccessor {
     @Invoker
     double invokeGetPositionY(double value);
 
-    @Invoker
-    RailAngle invokeGetRailAngle(boolean getEnd);
 }

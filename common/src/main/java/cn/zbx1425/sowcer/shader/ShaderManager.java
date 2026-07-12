@@ -82,7 +82,7 @@ public class ShaderManager {
         if (shaderInstance.MODEL_VIEW_MATRIX != null) {
             Matrix4f mvMatrix = new Matrix4f(RenderSystem.getModelViewMatrix()).copy();
             if (shaderProp.viewMatrix != null) mvMatrix.multiply(shaderProp.viewMatrix);
-            //if (materialProp.useMatixProcess()) AttrUtil.zeroRotation(mvMatrix);
+            if (materialProp.billboard) AttrUtil.zeroRotation(mvMatrix);
             shaderInstance.MODEL_VIEW_MATRIX.set(mvMatrix.asMoj());
         }
         if (shaderInstance.PROJECTION_MATRIX != null) {

@@ -25,15 +25,7 @@
     "TrainClientAccessor",
     "TrainClientMixin",
     "TrainClientRegistryMixin",
-    "GLFWMixin",
-    "DynamicImageAccessor",
-    "TrainRendererBaseAccessor",
-    "VehicleRidingClientMixin",
-    "CameraMixin",
-    "SidingScreenMixin",
-    "RenderTrainsAccessor",
-    "ItemRendererMixin",
-    "ModelBakeryMixin"
+    "GLFWMixin"
   ],
   "injectors": {
     "defaultRequire": 1
@@ -43,24 +35,6 @@
     "PackMixin",
     "RailActionsMixin",
     "RailMixin",
-    "RailwayDataAccessor",
-    "TrainMixin",
-    "SidingAccessor",
-    "SidingMixin",
-    "RailwayDataRailActionsModuleMixin",
-    "RailTypeMixin",
-    "RailAngleMixin",
-    "ItemNodeModifierBaseMixin",
-    "PathFinderMixin",
-    "ItemRailModifierMixin",
-    "RailwayDataMixin",
-    "FQTruffleLanguage",
-    "FQHotSpotTruffleRuntimeAccess",
-    "RouteMixin",
-    "DepotMixin",
-    "PathDataAccessor"
-  ],
-  "server": [
-    
+    "RailwayDataAccessor"
   ]
 }

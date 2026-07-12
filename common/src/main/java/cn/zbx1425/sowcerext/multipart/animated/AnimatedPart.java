@@ -17,7 +17,7 @@ public class AnimatedPart extends PartBase {
     public ModelCluster[] uploadedStates;
 
     public int refreshRateMillis = 0;
-    //public boolean billboard = false;
+    public boolean billboard = false;
 
     public FunctionScript stateFunction = FunctionScript.DEFAULT;
 

@@ -21,8 +21,8 @@ public class FaceList {
         this.needSorting = needSorting;
     }
 
-    public void addFace(Vertex[] vertices, int color, int light, int overlay) {
-        queuedFaces.add(new TransformedFace(vertices, color, light, overlay));
+    public void addFace(Vertex[] vertices, int color, int light) {
+        queuedFaces.add(new TransformedFace(vertices, color, light));
     }
 
     public void commit(MultiBufferSource bufferSource) {
@@ -38,7 +38,7 @@ public class FaceList {
                         .vertex(vertex.position.x(), vertex.position.y(), vertex.position.z())
                         .color((byte)(face.color >>> 24), (byte)(face.color >>> 16), (byte)(face.color >>> 8), (byte)(int)face.color)
                         .uv(vertex.u, vertex.v)
-                        .overlayCoords(face.overlay)
+                        .overlayCoords(OverlayTexture.NO_OVERLAY)
                         .uv2(face.light)
                         .normal(vertex.normal.x(), vertex.normal.y(), vertex.normal.z())
                         .endVertex();
@@ -51,15 +51,13 @@ public class FaceList {
         private final Vector3f sortingVector;
         int color;
         int light;
-        int overlay;
 
-        public TransformedFace(Vertex[] vertices, int color, int light, int overlay) {
+        public TransformedFace(Vertex[] vertices, int color, int light) {
             this.vertices = vertices;
             this.sortingVector = new Vector3f(0, 0, 0);
             for (Vertex vertex : vertices) this.sortingVector.add(vertex.position);
             this.color = color;
             this.light = light;
-            this.overlay = overlay;
         }
     }
 }

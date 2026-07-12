@@ -14,7 +14,6 @@ import cn.zbx1425.sowcerext.reuse.ModelManager;
 import net.minecraft.resources.ResourceLocation;
 
 import java.io.Closeable;
-import java.util.function.Function;
 
 public class ModelCluster implements Closeable {
 
@@ -63,41 +62,36 @@ public class ModelCluster implements Closeable {
         this.translucentParts = translucentParts;
     }
 
-    public void enqueueOpaqueGl(BatchManager batchManager, Matrix4f pose, int light, int overlay, DrawContext drawContext) {
+    public void enqueueOpaqueGl(BatchManager batchManager, Matrix4f pose, int light, DrawContext drawContext) {
+        // KHRDebug.glDebugMessageInsert(KHRDebug.GL_DEBUG_SOURCE_APPLICATION, KHRDebug.GL_DEBUG_TYPE_MARKER,
+        //        0, KHRDebug.GL_DEBUG_SEVERITY_NOTIFICATION, "RenderOptimized " + (source.sourceLocation == null ? "unknown" : source.sourceLocation.toString()));
         int shaderLightmapUV = AttrUtil.exchangeLightmapUVBits(light);
         batchManager.enqueue(uploadedOpaqueParts, new EnqueueProp(
                 new VertAttrState()
-                        .setColor(255, 255, 255, 255).setOverlayUV(overlay)
+                        .setColor(255, 255, 255, 255).setOverlayUVNoOverlay()
                         .setLightmapUV(shaderLightmapUV).setModelMatrix(pose)
         ), ShaderProp.DEFAULT);
     }
 
-    public void enqueueOpaqueBlaze(BufferSourceProxy vertexConsumers, Matrix4f pose, int light, int overlay, DrawContext drawContext) {
-        opaqueParts.writeBlazeBuffer(vertexConsumers, pose, light, overlay, drawContext);
+    public void enqueueOpaqueBlaze(BufferSourceProxy vertexConsumers, Matrix4f pose, int light, DrawContext drawContext) {
+        opaqueParts.writeBlazeBuffer(vertexConsumers, pose, light, drawContext);
     }
 
-    public void enqueueTranslucentGl(BatchManager batchManager, Matrix4f matrix4f, int light, int overlay, DrawContext drawContext) {
+    public void enqueueTranslucentGl(BatchManager batchManager, Matrix4f matrix4f, int light, DrawContext drawContext) {
         int shaderLightmapUV = AttrUtil.exchangeLightmapUVBits(light);
         batchManager.enqueue(uploadedTranslucentParts, new EnqueueProp(
                 new VertAttrState()
-                        .setColor(255, 255, 255, 255).setOverlayUV(overlay)
+                        .setColor(255, 255, 255, 255).setOverlayUVNoOverlay()
                         .setLightmapUV(shaderLightmapUV).setModelMatrix(matrix4f)
         ), ShaderProp.DEFAULT);
     }
 
-    public void enqueueTranslucentBlaze(BufferSourceProxy vertexConsumers, Matrix4f pose, int light, int overlay, DrawContext drawContext) {
-        translucentParts.writeBlazeBuffer(vertexConsumers, pose, light, overlay, drawContext);
-    }
-
-    public void setMatixProcess(Function<Matrix4f, Matrix4f> matrixProcess) {
-        opaqueParts.setMatixProcess(matrixProcess);
-        translucentParts.setMatixProcess(matrixProcess);
-        uploadedOpaqueParts.setMatixProcess(matrixProcess);
-        uploadedTranslucentParts.setMatixProcess(matrixProcess);
+    public void enqueueTranslucentBlaze(BufferSourceProxy vertexConsumers, Matrix4f pose, int light, DrawContext drawContext) {
+        translucentParts.writeBlazeBuffer(vertexConsumers, pose, light, drawContext);
     }
 
     @Override
-    public void close() {
+    public void close(){
         uploadedOpaqueParts.close();
         uploadedTranslucentParts.close();
     }

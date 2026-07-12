@@ -78,20 +78,12 @@ public class Vector3f {
         impl.cross(other.impl);
     }
 
-    public org.joml.Vector3f asMoj() {
-        return impl;
-    }
-
     #else
 
     protected final com.mojang.math.Vector3f impl;
 
     public Vector3f(float x, float y, float z) {
         this.impl = new com.mojang.math.Vector3f(x, y, z);
-    }
-
-    public Vector3f(com.mojang.math.Vector3f moj) {
-        this.impl = moj.copy();
     }
 
     public float x() { return impl.x(); }
@@ -154,23 +146,11 @@ public class Vector3f {
         impl.cross(other.impl);
     }
 
-    public com.mojang.math.Vector3f asMoj() {
-        return impl.copy();
-    }
-
 #endif
-
-    public Vector3f(double x, double y, double z) {
-        this((float)x, (float)y, (float)z);
-    }
 
     @Override
     public int hashCode() {
         return impl.hashCode();
-    }
-
-    public String toString() {
-        return "(" + x() + ", " + y() + ", " + z() + ")";
     }
 
     public float distance(Vector3f other) {
@@ -201,14 +181,6 @@ public class Vector3f {
 
     public Vec3 toVec3() {
         return new Vec3(x(), y(), z());
-    }
-
-    public float lengthSquared() {
-        return x() * x() + y() * y() + z() * z();
-    }
-
-    public void add(double x, double y, double z) {
-        add((float) x, (float) y, (float) z);
     }
 
     @Override

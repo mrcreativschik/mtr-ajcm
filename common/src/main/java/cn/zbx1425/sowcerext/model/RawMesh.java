@@ -19,9 +19,6 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.*;
-import java.util.function.Function;
-import java.util.function.Supplier;
-import java.util.function.Consumer;
 
 public class RawMesh {
 
@@ -179,31 +176,6 @@ public class RawMesh {
     }
 
     public void upload(Mesh mesh, VertAttrMapping mapping) {
-        _uploadAsync(mapping).accept(mesh);
-    }
-
-    public Mesh upload(VertAttrMapping mapping) {
-        validateVertIndex();
-        VertBuf vertBufObj = new VertBuf();
-        IndexBuf indexBufObj = new IndexBuf(faces.size(), GL11.GL_UNSIGNED_INT);
-        Mesh target = new Mesh(vertBufObj, indexBufObj, materialProp);
-        upload(target, mapping);
-        return target;
-    }
-
-    public Supplier<Mesh> uploadAsync(VertAttrMapping mapping) {
-        validateVertIndex();
-        Consumer<Mesh> consumer = _uploadAsync(mapping);
-        return () -> {
-            VertBuf vertBufObj = new VertBuf();
-            IndexBuf indexBufObj = new IndexBuf(faces.size(), GL11.GL_UNSIGNED_INT);
-            Mesh target = new Mesh(vertBufObj, indexBufObj, materialProp);
-            consumer.accept(target);
-            return target;
-        };
-    }
-
-    private Consumer<Mesh> _uploadAsync(VertAttrMapping mapping) {
         distinct();
 
         ByteBuffer vertBuf = OffHeapAllocator.allocate(vertices.size() * mapping.strideVertex);
@@ -235,6 +207,8 @@ public class RawMesh {
             }
             for (int k = 0; k < mapping.paddingVertex; k++) vertBuf.put((byte)0);
         }
+        mesh.vertBuf.upload(vertBuf, VertBuf.USAGE_STATIC_DRAW);
+        OffHeapAllocator.free(vertBuf);
 
         ByteBuffer indexBuf = OffHeapAllocator.allocate(faces.size() * 3 * 4);
         for (Face face : faces) {
@@ -242,17 +216,19 @@ public class RawMesh {
                 indexBuf.putInt(face.vertices[j]);
             }
         }
+        mesh.indexBuf.upload(indexBuf, VertBuf.USAGE_STATIC_DRAW);
+        mesh.indexBuf.setFaceCount(faces.size());
+        OffHeapAllocator.free(indexBuf);
 
-        boolean[] executed = new boolean[] {false};
-        return mesh -> {
-            if (executed[0]) return;
-            executed[0] = true;
-            mesh.vertBuf.upload(vertBuf, VertBuf.USAGE_STATIC_DRAW);
-            OffHeapAllocator.free(vertBuf);
-            mesh.indexBuf.upload(indexBuf, VertBuf.USAGE_STATIC_DRAW);
-            mesh.indexBuf.setFaceCount(faces.size());
-            OffHeapAllocator.free(indexBuf);
-        };
+    }
+
+    public Mesh upload(VertAttrMapping mapping) {
+        validateVertIndex();
+        VertBuf vertBufObj = new VertBuf();
+        IndexBuf indexBufObj = new IndexBuf(faces.size(), GL11.GL_UNSIGNED_INT);
+        Mesh target = new Mesh(vertBufObj, indexBufObj, materialProp);
+        upload(target, mapping);
+        return target;
     }
 
     private static int getVertBufPos(VertAttrMapping mapping, int vertId, VertAttrType type) {
@@ -383,12 +359,10 @@ public class RawMesh {
                 materialProp.translucent = true;
                 materialProp.writeDepthBuf = false;
                 break;
-            default:
-                throw new IllegalArgumentException("Invalid render type: " + type);
         }
     }
 
-    public void writeBlazeBuffer(FaceList vertexConsumer, Matrix4f matrix, int color, int light, int overlay, DrawContext drawContext) {
+    public void writeBlazeBuffer(FaceList vertexConsumer, Matrix4f matrix, int color, int light, DrawContext drawContext) {
         drawContext.recordBlazeAction(faces.size());
         for (Face face : faces) {
             assert face.vertices.length == 3;
@@ -400,7 +374,7 @@ public class RawMesh {
                 transformedVertices[i].u = this.vertices.get(face.vertices[i]).u;
                 transformedVertices[i].v = this.vertices.get(face.vertices[i]).v;
             }
-            vertexConsumer.addFace(transformedVertices, color, light, overlay);
+            vertexConsumer.addFace(transformedVertices, color, light);
         }
     }
 
@@ -424,9 +398,5 @@ public class RawMesh {
         for (Vertex vertex : vertices) vertex.serializeTo(dos);
         dos.writeInt(faces.size());
         for (Face face : faces) face.serializeTo(dos);
-    }
-
-    public void setMatixProcess(Function<Matrix4f, Matrix4f> matrixProcess) {
-        materialProp.setMatixProcess(matrixProcess);
     }
 }

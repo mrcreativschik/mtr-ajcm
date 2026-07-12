@@ -6,14 +6,12 @@ import cn.zbx1425.sowcer.object.VertArray;
 import cn.zbx1425.sowcer.vertex.VertAttrMapping;
 import cn.zbx1425.sowcerext.model.RawMesh;
 import net.minecraft.resources.ResourceLocation;
-import cn.zbx1425.sowcer.math.Matrix4f;
 
 import java.io.Closeable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 
 public class VertArrays implements Closeable {
 
@@ -52,12 +50,6 @@ public class VertArrays implements Closeable {
             result.meshList.add(newVertArray);
         }
         return result;
-    }
-
-    public void setMatixProcess(Function<Matrix4f, Matrix4f> matrixProcess) {
-        for (VertArray vertArray : meshList) {
-            vertArray.materialProp.setMatixProcess(matrixProcess);
-        }
     }
 
     @Override

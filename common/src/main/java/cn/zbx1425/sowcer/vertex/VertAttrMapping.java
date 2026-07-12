@@ -89,7 +89,10 @@ public class VertAttrMapping {
         private final HashMap<VertAttrType, VertAttrSrc> sources;
 
         public Builder() {
-            sources = new HashMap<>();
+            sources = new HashMap<>(VertAttrType.values().length);
+            for (VertAttrType attrType : VertAttrType.values()) {
+                sources.put(attrType, VertAttrSrc.VERTEX_BUF);
+            }
         }
 
         public Builder set(VertAttrType type, VertAttrSrc src) {

@@ -9,37 +9,23 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import org.lwjgl.opengl.GL33;
-import org.lwjgl.BufferUtils;
-import net.minecraft.client.Minecraft;
-import cn.zbx1425.mtrsteamloco.Main;
 
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.util.Objects;
-import java.util.Arrays;
-import java.util.function.Function;
 
 public class VertAttrState {
 
-    public static final Function<Matrix4f, Matrix4f> BILLBOARD = (matrix) -> {
-        Vector3f pos = matrix.getTranslationPart();
-        Matrix4f result = new Matrix4f();
-        result.translate(pos);
-        return result;
-    };
     public Vector3f position;
     public Integer color;
     public Float texU, texV;
     public Integer overlayUV;
     public Integer lightmapUV;
     public Vector3f normal;
-    public Function<Matrix4f, Matrix4f> matrixModel;
-    public boolean useMatixProcess = false;
-    public static Matrix4f nowMatrix = new Matrix4f();
+    public Matrix4f matrixModel;
 
     public void applyGlobal() {
         for (VertAttrType attr : VertAttrType.values()) {
-            final boolean useCustomShader = ShadersModHandler.canUseCustomShader();
             switch (attr) {
                 case POSITION:
                     if (position == null) continue;
@@ -78,20 +64,27 @@ public class VertAttrState {
                     break;
                 case MATRIX_MODEL:
                     if (matrixModel == null) continue;
-                    nowMatrix = matrixModel.apply(nowMatrix);
+                    final boolean useCustomShader = ShadersModHandler.canUseCustomShader();
                     if (useCustomShader) {
                         ByteBuffer byteBuf = ByteBuffer.allocate(64);
                         FloatBuffer floatBuf = byteBuf.asFloatBuffer();
-                        nowMatrix.store(floatBuf);
-                        GL33.glVertexAttrib4f(attr.location, floatBuf.get(0), floatBuf.get(1), floatBuf.get(2), floatBuf.get(3));
-                        GL33.glVertexAttrib4f(attr.location + 1, floatBuf.get(4), floatBuf.get(5), floatBuf.get(6), floatBuf.get(7));
-                        GL33.glVertexAttrib4f(attr.location + 2, floatBuf.get(8), floatBuf.get(9), floatBuf.get(10), floatBuf.get(11));
-                        GL33.glVertexAttrib4f(attr.location + 3, floatBuf.get(12), floatBuf.get(13), floatBuf.get(14), floatBuf.get(15));
+                        matrixModel.store(floatBuf);
+                        /*if (materialProp.billboard) {
+                            GL33.glVertexAttrib4f(attr.location, 1, 0, 0, 0);
+                            GL33.glVertexAttrib4f(attr.location + 1, 0, 1, 0, 0);
+                            GL33.glVertexAttrib4f(attr.location + 2, 0, 0, 1, 0);
+                            GL33.glVertexAttrib4f(attr.location + 3, floatBuf.get(12), floatBuf.get(13), floatBuf.get(14), floatBuf.get(15));
+                        } else {*/
+                            GL33.glVertexAttrib4f(attr.location, floatBuf.get(0), floatBuf.get(1), floatBuf.get(2), floatBuf.get(3));
+                            GL33.glVertexAttrib4f(attr.location + 1, floatBuf.get(4), floatBuf.get(5), floatBuf.get(6), floatBuf.get(7));
+                            GL33.glVertexAttrib4f(attr.location + 2, floatBuf.get(8), floatBuf.get(9), floatBuf.get(10), floatBuf.get(11));
+                            GL33.glVertexAttrib4f(attr.location + 3, floatBuf.get(12), floatBuf.get(13), floatBuf.get(14), floatBuf.get(15));
+                        // }
                     } else {
                         ShaderInstance shaderInstance = RenderSystem.getShader();
                         if (shaderInstance != null && shaderInstance.MODEL_VIEW_MATRIX != null) {
-                            shaderInstance.MODEL_VIEW_MATRIX.set(nowMatrix.asMoj());
-                            if (useCustomShader) {
+                            shaderInstance.MODEL_VIEW_MATRIX.set(matrixModel.asMoj());
+                            if (ShadersModHandler.canUseCustomShader()) {
                                 shaderInstance.MODEL_VIEW_MATRIX.upload();
                             } else {
                                 shaderInstance.apply();
@@ -130,7 +123,7 @@ public class VertAttrState {
     }
 
     public VertAttrState setOverlayUV(int uv) {
-        this.overlayUV = AttrUtil.exchangeLightmapUVBits(uv);
+        this.overlayUV = uv;
         return this;
     }
 
@@ -150,20 +143,8 @@ public class VertAttrState {
     }
 
     public VertAttrState setModelMatrix(Matrix4f matrix) {
-        this.matrixModel = (matrixIn) -> {
-            // nowMatrix = matrix;    
-            return matrix;
-        };
+        this.matrixModel = matrix;
         return this;
-    }
-
-    public VertAttrState setMatixProcess(Function<Matrix4f, Matrix4f> matrixProcess) {
-        this.matrixModel = matrixModel;
-        return this;
-    }
-
-    public boolean useMatixProcess() {
-        return useMatixProcess;
     }
 
     public boolean hasAttr(VertAttrType attrType) {
@@ -236,7 +217,7 @@ public class VertAttrState {
         clone.texV = this.texV;
         clone.lightmapUV = this.lightmapUV;
         clone.normal = this.normal == null ? null : this.normal.copy();
-        clone.matrixModel = this.matrixModel == null ? null : this.matrixModel;
+        clone.matrixModel = this.matrixModel == null ? null : this.matrixModel.copy();
         return clone;
     }
 }

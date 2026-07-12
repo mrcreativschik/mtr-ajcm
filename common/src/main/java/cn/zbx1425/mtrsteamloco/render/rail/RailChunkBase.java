@@ -9,29 +9,20 @@ import mtr.data.RailAngle;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.ChunkPos;
-import cn.zbx1425.mtrsteamloco.scripting.util.client.DynamicModelHolder;
-import cn.zbx1425.sowcerext.reuse.DrawScheduler;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import java.util.concurrent.ConcurrentLinkedQueue;
 
 import java.io.Closeable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 public abstract class RailChunkBase implements Closeable {
-
-    protected static ExecutorService EXECUTOR = Executors.newCachedThreadPool();
-    protected static ConcurrentLinkedQueue<Runnable> UPLOAD_QUEUE = new ConcurrentLinkedQueue<>();
 
     public Long chunkId;
     public AABB boundingBox;
     public HashMap<BakedRail, ArrayList<Matrix4f>> containingRails = new HashMap<>();
-    public HashMap<BakedRail, ArrayList<Matrix4f>> containingRailsWriting = new HashMap<>();
 
     public final String modelKey;
 
@@ -40,7 +31,6 @@ public abstract class RailChunkBase implements Closeable {
 
     public boolean isDirty = false;
     public boolean bufferBuilt = false;
-    public boolean bufferBuilding = false;
     public double cameraDistManhattanXZ = 0;
 
     public RailChunkBase(long chunkId, String modelKey) {
@@ -79,34 +69,23 @@ public abstract class RailChunkBase implements Closeable {
     }
 
     public void addRail(BakedRail rail) {
-        containingRailsWriting.put(rail, rail.coveredChunks.get(chunkId));
+        containingRails.put(rail, rail.coveredChunks.get(chunkId));
         isDirty = true;
     }
 
     public void removeRail(BakedRail rail) {
-        containingRailsWriting.remove(rail);
+        containingRails.remove(rail);
         isDirty = true;
     }
 
     public void rebuildBuffer(Level world) {
-        bufferBuilding = true;
         isDirty = false;
         bufferBuilt = true;
-        containingRails.clear();
-        containingRails.putAll(containingRailsWriting);
     }
     public abstract void enqueue(BatchManager batchManager, ShaderProp shaderProp);
 
-    // private static long lastUploadTime = 0L;
-    public static void upload() {
-        if (!UPLOAD_QUEUE.isEmpty()) {
-            // if (lastUploadTime < System.currentTimeMillis() - 100) {
-                UPLOAD_QUEUE.poll().run();
-                // lastUploadTime = System.currentTimeMillis();
-            // }
-        }
-    }
-
     @Override
-    public abstract void close();
+    public void close() {
+
+    }
 }

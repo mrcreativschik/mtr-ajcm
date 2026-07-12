@@ -11,21 +11,18 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.resources.ResourceLocation;
 import org.lwjgl.opengl.GL33;
-import cn.zbx1425.sowcer.math.Matrix4f;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
-import java.util.Arrays;
-import java.util.function.Function;
 
 /** Properties regarding material. Set during model loading. Affects batching. */
 public class MaterialProp {
 
     /** Name of the shader program. Must be loaded in ShaderManager. */
-    public String shaderName = "";
+    public String shaderName;
     /** The texture to use. Null disables texture. */
     public ResourceLocation texture;
 
@@ -38,7 +35,7 @@ public class MaterialProp {
     public boolean writeDepthBuf = true;
     /** If the renderer should remove rotation components from model and view matrices.
      *  Results in faces on the XY plane always facing the camera. */
-    // public boolean billboard = false;
+    public boolean billboard = false;
 
     public boolean cutoutHack = false;
 
@@ -52,7 +49,6 @@ public class MaterialProp {
     }
     public MaterialProp(String shaderName) {
         this.shaderName = shaderName;
-        checkShaderName();
     }
 
     public MaterialProp(DataInputStream dis) throws IOException {
@@ -65,14 +61,8 @@ public class MaterialProp {
         this.attrState.lightmapUV = mtlObj.get("lightmapUV").isJsonNull() ? null : mtlObj.get("lightmapUV").getAsInt();
         this.translucent = mtlObj.has("translucent") && mtlObj.get("translucent").getAsBoolean();
         this.writeDepthBuf = mtlObj.has("writeDepthBuf") && mtlObj.get("writeDepthBuf").getAsBoolean();
-        boolean isBillboard = mtlObj.has("billboard") && mtlObj.get("billboard").getAsBoolean();
-        attrState.setMatixProcess(VertAttrState.BILLBOARD);
+        this.billboard = mtlObj.has("billboard") && mtlObj.get("billboard").getAsBoolean();
         this.cutoutHack = mtlObj.has("cutoutHack") && mtlObj.get("cutoutHack").getAsBoolean();
-        checkShaderName();
-    }
-
-    private void checkShaderName() {
-        if (shaderName == null) shaderName = "";
     }
 
     public static final ResourceLocation WHITE_TEXTURE_LOCATION = new ResourceLocation("minecraft:textures/misc/white.png");
@@ -108,7 +98,6 @@ public class MaterialProp {
     public RenderType getBlazeRenderType() {
         RenderType result;
         ResourceLocation textureToUse = texture == null ? WHITE_TEXTURE_LOCATION : texture;
-        checkShaderName();
         switch (shaderName) {
             case "rendertype_entity_cutout":
                 result = BlazeRenderType.entityCutout(textureToUse);
@@ -138,6 +127,7 @@ public class MaterialProp {
         this.attrState = other.attrState.copy();
         this.translucent = other.translucent;
         this.writeDepthBuf = other.writeDepthBuf;
+        this.billboard = other.billboard;
         this.sheetElementsU = other.sheetElementsU;
         this.sheetElementsV = other.sheetElementsV;
     }
@@ -163,7 +153,7 @@ public class MaterialProp {
         }
         mtlObj.addProperty("translucent", this.translucent);
         mtlObj.addProperty("writeDepthBuf", this.writeDepthBuf);
-        mtlObj.addProperty("billboard", this.attrState.useMatixProcess());
+        mtlObj.addProperty("billboard", this.billboard);
         mtlObj.addProperty("cutoutHack", this.cutoutHack);
         String content = mtlObj.toString();
         byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
@@ -171,14 +161,6 @@ public class MaterialProp {
         dos.write(contentBytes);
     }
 
-    public boolean useMatixProcess() {
-        return attrState.useMatixProcess();
-    }
-
-    public void setMatixProcess(Function<Matrix4f, Matrix4f> matrixProces) {
-        attrState.setMatixProcess(matrixProces);
-    }
-    
     @Override
     public String toString() {
         return String.format("{%s: %s%s}",
@@ -191,7 +173,7 @@ public class MaterialProp {
         if (o == null || getClass() != o.getClass()) return false;
         MaterialProp that = (MaterialProp) o;
         return translucent == that.translucent && writeDepthBuf == that.writeDepthBuf
-                && cutoutHack == that.cutoutHack
+                && billboard == that.billboard && cutoutHack == that.cutoutHack
                 && sheetElementsU == that.sheetElementsU && sheetElementsV == that.sheetElementsV
                 && Objects.equals(shaderName, that.shaderName) && Objects.equals(texture, that.texture)
                 && Objects.equals(attrState, that.attrState);
@@ -199,7 +181,7 @@ public class MaterialProp {
 
     @Override
     public int hashCode() {
-        return Objects.hash(shaderName, texture, attrState, translucent, writeDepthBuf,
+        return Objects.hash(shaderName, texture, attrState, translucent, writeDepthBuf, billboard,
                 cutoutHack, sheetElementsU, sheetElementsV);
     }
 }

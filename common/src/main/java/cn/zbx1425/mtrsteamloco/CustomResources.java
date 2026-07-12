@@ -4,11 +4,11 @@ import cn.zbx1425.mtrsteamloco.data.ScriptedCustomTrains;
 import cn.zbx1425.mtrsteamloco.data.EyeCandyRegistry;
 import cn.zbx1425.mtrsteamloco.data.RailModelRegistry;
 import cn.zbx1425.mtrsteamloco.mixin.TrainClientAccessor;
-import cn.zbx1425.mtrsteamloco.scripting.AbstractScriptContext;
-import cn.zbx1425.mtrsteamloco.scripting.ScriptContextManager;
-import cn.zbx1425.mtrsteamloco.scripting.ScriptHolderClient;
-import cn.zbx1425.mtrsteamloco.scripting.util.client.ScriptResourceUtilClient;
-import cn.zbx1425.mtrsteamloco.scripting.eyecandy.EyeCandyScriptContext;
+import cn.zbx1425.mtrsteamloco.render.scripting.AbstractScriptContext;
+import cn.zbx1425.mtrsteamloco.render.scripting.ScriptContextManager;
+import cn.zbx1425.mtrsteamloco.render.scripting.ScriptHolder;
+import cn.zbx1425.mtrsteamloco.render.scripting.ScriptResourceUtil;
+import cn.zbx1425.mtrsteamloco.render.scripting.eyecandy.EyeCandyScriptContext;
 import cn.zbx1425.mtrsteamloco.render.train.NoopTrainRenderer;
 import cn.zbx1425.mtrsteamloco.render.train.RenderTrainD51;
 import cn.zbx1425.mtrsteamloco.render.train.RenderTrainDK3;
@@ -25,7 +25,6 @@ import mtr.sound.TrainSoundBase;
 import mtr.sound.bve.BveTrainSoundConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.server.packs.resources.ResourceManager;
-import cn.zbx1425.mtrsteamloco.render.block.BlockEntityDirectNodeRenderer;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -43,23 +42,20 @@ public class CustomResources {
     }
 
     public static void init(ResourceManager resourceManager) {
-        Main.LOGGER.info("MTR-ANTE has started loading custom resources.");
-
-        ClientConfig.clearCustomResponders();
+        Main.LOGGER.info("MTR-NTE has started loading custom resources.");
 
         EyeCandyRegistry.reload(resourceManager);
         RailModelRegistry.reload(resourceManager);
 
-        ScriptHolderClient.resetRunner();
-        ScriptResourceUtilClient.init(resourceManager);
+        ScriptHolder.resetRunner();
+        ScriptResourceUtil.init(resourceManager);
         ScriptedCustomTrains.init(resourceManager);
 
         RenderTrainD51.initGLModel(resourceManager);
         RenderTrainDK3.initGLModel(resourceManager);
         RenderTrainDK3Mini.initGLModel(resourceManager);
-        BlockEntityDirectNodeRenderer.initGLModel(resourceManager);
 
-        Main.LOGGER.info("MTR-ANTE: "
+        Main.LOGGER.info("MTR-NTE: "
                 + "Uploaded Models: " + MainClient.modelManager.uploadedVertArrays.size()
                 + " (" + MainClient.modelManager.vaoCount + " VAOs, "
                 + MainClient.modelManager.vboCount + " VBOs)"
@@ -118,7 +114,7 @@ public class CustomResources {
             }
         }
 
-        ScriptContextManager.disposeAllContexts();
+        ScriptContextManager.disposeDeadContexts();
 
         ClientData.TRAINS.forEach(train -> {
             train.isRemoved = false;

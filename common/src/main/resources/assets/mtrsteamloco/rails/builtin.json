@@ -15,6 +15,5 @@
         "name": "rail.mtrsteamloco.builtin_flat",
         "model": "mtrsteamloco:models/rail_flat.csv",
         "repeatInterval": 0.5
-    },
-    "group": "group.mtrsteamloco.builtin"
+    }
 }

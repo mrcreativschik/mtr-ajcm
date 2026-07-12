@@ -10,8 +10,6 @@ import cn.zbx1425.sowcer.math.Matrix4f;
 import cn.zbx1425.sowcer.math.Vector3f;
 import cn.zbx1425.sowcer.model.Model;
 import cn.zbx1425.sowcer.model.VertArrays;
-import org.msgpack.core.MessagePacker;
-import cn.zbx1425.sowcerext.reuse.DrawScheduler;
 import cn.zbx1425.sowcer.object.InstanceBuf;
 import cn.zbx1425.sowcer.object.VertBuf;
 import cn.zbx1425.sowcer.util.OffHeapAllocator;
@@ -65,50 +63,45 @@ public class InstancedRailChunk extends RailChunkBase {
         super.rebuildBuffer(world);
         if (vertArrays == null) return;
 
-        EXECUTOR.execute(() -> {
-            int instanceCount = containingRails.values().stream().mapToInt(ArrayList::size).sum();
-            float yMin = 256, yMax = -64;
+        int instanceCount = containingRails.values().stream().mapToInt(ArrayList::size).sum();
+        float yMin = 256, yMax = -64;
 
-            ByteBuffer byteBuf = OffHeapAllocator.allocate(instanceCount * RAIL_MAPPING.strideInstance);
-            ByteBufferOutputStream byteArrayOutputStream = new ByteBufferOutputStream(byteBuf, false);
-            LittleEndianDataOutputStream oStream = new LittleEndianDataOutputStream(byteArrayOutputStream);
+        ByteBuffer byteBuf = OffHeapAllocator.allocate(instanceCount * RAIL_MAPPING.strideInstance);
+        ByteBufferOutputStream byteArrayOutputStream = new ByteBufferOutputStream(byteBuf, false);
+        LittleEndianDataOutputStream oStream = new LittleEndianDataOutputStream(byteArrayOutputStream);
 
-            for (Map.Entry<BakedRail, ArrayList<Matrix4f>> entry : containingRails.entrySet()) {
-                ArrayList<Matrix4f> railSpan = entry.getValue();
-                for (Matrix4f pieceMat : railSpan) {
-                    try {
-                        oStream.writeInt(entry.getKey().color);
+        for (Map.Entry<BakedRail, ArrayList<Matrix4f>> entry : containingRails.entrySet()) {
+            ArrayList<Matrix4f> railSpan = entry.getValue();
+            for (Matrix4f pieceMat : railSpan) {
+                try {
+                    oStream.writeInt(entry.getKey().color);
 
-                        final Vector3f lightPos = pieceMat.getTranslationPart();
-                        yMin = Math.min(yMin, lightPos.y());
-                        yMax = Math.max(yMax, lightPos.y());
-                        final BlockPos lightBlockPos = new BlockPos(Mth.floor(lightPos.x()), Mth.floor(lightPos.y() + 0.1), Mth.floor(lightPos.z()));
-                        final int light = LightTexture.pack(world.getBrightness(LightLayer.BLOCK, lightBlockPos), world.getBrightness(LightLayer.SKY, lightBlockPos));
-                        oStream.writeInt(light);
+                    final Vector3f lightPos = pieceMat.getTranslationPart();
+                    yMin = Math.min(yMin, lightPos.y());
+                    yMax = Math.max(yMax, lightPos.y());
+                    final BlockPos lightBlockPos = new BlockPos(Mth.floor(lightPos.x()), Mth.floor(lightPos.y() + 0.1), Mth.floor(lightPos.z()));
+                    final int light = LightTexture.pack(world.getBrightness(LightLayer.BLOCK, lightBlockPos), world.getBrightness(LightLayer.SKY, lightBlockPos));
+                    oStream.writeInt(light);
 
-                        byte[] lookAtBytes = new byte[4 * 16];
-                        ByteBuffer matByteBuf = ByteBuffer.wrap(lookAtBytes).order(ByteOrder.nativeOrder());
-                        FloatBuffer matFloatBuf = matByteBuf.asFloatBuffer();
-                        pieceMat.store(matFloatBuf);
-                        oStream.write(lookAtBytes);
+                    byte[] lookAtBytes = new byte[4 * 16];
+                    ByteBuffer matByteBuf = ByteBuffer.wrap(lookAtBytes).order(ByteOrder.nativeOrder());
+                    FloatBuffer matFloatBuf = matByteBuf.asFloatBuffer();
+                    pieceMat.store(matFloatBuf);
+                    oStream.write(lookAtBytes);
 
-                        for (int k = 0; k < RAIL_MAPPING.paddingInstance; k++) oStream.writeByte(0);
-                    } catch (IOException ignored) {
+                    for (int k = 0; k < RAIL_MAPPING.paddingInstance; k++) oStream.writeByte(0);
+                } catch (IOException ignored) {
 
-                    }
                 }
             }
+        }
 
-            UPLOAD_QUEUE.offer(() -> {
-                instanceBuf.size = instanceCount;
-                instanceBuf.upload(byteBuf, VertBuf.USAGE_DYNAMIC_DRAW);
-                OffHeapAllocator.free(byteBuf);
-                bufferBuilding = false;
-            });
+        instanceBuf.size = instanceCount;
+        instanceBuf.upload(byteBuf, VertBuf.USAGE_DYNAMIC_DRAW);
+        OffHeapAllocator.free(byteBuf);
 
-            if (yMin > yMax) yMin = yMax;
-            setBoundingBox(yMin, yMax);
-        });
+        if (yMin > yMax) yMin = yMax;
+        setBoundingBox(yMin, yMax);
     }
 
     @Override

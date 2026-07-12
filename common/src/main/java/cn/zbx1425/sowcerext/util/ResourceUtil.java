@@ -2,6 +2,7 @@ package cn.zbx1425.sowcerext.util;
 
 import cn.zbx1425.sowcer.batch.MaterialProp;
 import mtr.mappings.Utilities;
+import mtr.mappings.UtilitiesClient;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
@@ -13,17 +14,13 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.List;
 import java.util.Locale;
 
 public class ResourceUtil {
 
     public static String readResource(ResourceManager manager, ResourceLocation location) throws IOException {
-#if MC_VERSION >= "11902"
-        final List<Resource> resources = manager.getResourceStack(location);
-#else
-        final List<Resource> resources = manager.getResources(location);
-#endif
+        final List<Resource> resources = UtilitiesClient.getResources(manager, location);
         if (resources.isEmpty()) return "";
         return IOUtils.toString(new BOMInputStream(Utilities.getInputStream(resources.get(0))), StandardCharsets.UTF_8);
     }
@@ -45,35 +42,8 @@ public class ResourceUtil {
         if (expectExtension != null && !relative.endsWith(expectExtension)) {
             relative += expectExtension;
         }
-
-        String base = baseFile.getPath();
-        String[] baseParts = base.split("/");
-        String[] relativeParts = relative.split("/");
-        Deque<String> stack = new LinkedList<>();
-        for (String part : baseParts) {
-            if (part.isEmpty()) throw new IllegalArgumentException("Invalid base file path: " + base);
-            stack.push(part);
-        }
-        stack.pop();
-        for (String part : relativeParts) {
-            if (part.equals(".")) continue;
-            if (part.equals("..")) {
-                if (stack.isEmpty()) {
-                    throw new IllegalArgumentException("Out of range: " + relative + " relative to "   + base);
-                } else {
-                    stack.pop();
-                }
-                continue;
-            }
-            stack.push(part);
-        }
-        StringBuilder sb = new StringBuilder();
-        while (!stack.isEmpty()) {
-            sb.append(stack.removeLast()).append("/");
-        }
-        String path = sb.toString();
-        if (path.endsWith("/")) path = path.substring(0, path.length() - 1);
-
-        return new ResourceLocation(baseFile.getNamespace(), path);
+        String resolvedPath = FileSystems.getDefault().getPath(baseFile.getPath()).getParent().resolve(relative)
+                .normalize().toString().replace('\\', '/');
+        return new ResourceLocation(baseFile.getNamespace(), resolvedPath);
     }
 }

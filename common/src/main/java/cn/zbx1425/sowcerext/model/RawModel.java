@@ -19,11 +19,6 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.Supplier;
-import cn.zbx1425.sowcer.model.Mesh;
-import java.util.function.Function;
-import java.util.HashSet;
-import java.util.Set;
 
 public class RawModel {
 
@@ -50,22 +45,6 @@ public class RawModel {
             model.meshList.add(mesh.upload(mapping));
         }
         return model;
-    }
-
-    public Supplier<Model> uploadAsync(VertAttrMapping mapping) { 
-        Model model = new Model();
-        Set<Runnable> uploadTasks = new HashSet<>();
-        for (RawMesh mesh : meshList.values()) {
-            if (mesh.faces.isEmpty()) continue;
-            Supplier<Mesh> meshSupplier = mesh.uploadAsync(mapping);
-            uploadTasks.add(() -> {
-                model.meshList.add(meshSupplier.get());
-            });
-        }
-        return () -> {
-            for (Runnable task : uploadTasks) task.run();
-            return model;
-        };
     }
 
     public void append(RawMesh nextMesh) {
@@ -205,13 +184,12 @@ public class RawModel {
         }
     }
 
-    public void writeBlazeBuffer(BufferSourceProxy vertexConsumers, Matrix4f matrix, int light, int overlay, DrawContext drawContext) {
+    public void writeBlazeBuffer(BufferSourceProxy vertexConsumers, Matrix4f matrix, int light, DrawContext drawContext) {
         if (meshList.isEmpty()) return;
         for (Map.Entry<MaterialProp, RawMesh> entry : meshList.entrySet()) {
             RenderType renderType = entry.getKey().getBlazeRenderType();
             int resultColor = entry.getKey().attrState.color != null ? entry.getKey().attrState.color : 0xFFFFFFFF;
             int resultLight = entry.getKey().attrState.lightmapUV != null ? entry.getKey().attrState.lightmapUV : light;
-            int resultOverlay = entry.getKey().attrState.overlayUV != null ? AttrUtil.exchangeLightmapUVBits(entry.getKey().attrState.overlayUV) : overlay;
 
             /*
             if (Objects.equals(entry.getKey().shaderName, "rendertype_entity_translucent_cull") && (resultColor & 0xFF) != 0xFF) {
@@ -222,13 +200,13 @@ public class RawModel {
             */
 
             Matrix4f resultMatrix = matrix;
-            /*if (entry.getKey().useMatixProcess()) {
+            if (entry.getKey().billboard) {
                 resultMatrix = matrix.copy();
                 AttrUtil.zeroRotation(resultMatrix);
-            }*/
+            }
 
             entry.getValue().writeBlazeBuffer(vertexConsumers.getBuffer(renderType, entry.getKey().translucent),
-                    resultMatrix, resultColor, resultLight, resultOverlay, drawContext);
+                    resultMatrix, resultColor, resultLight, drawContext);
         }
     }
 
@@ -256,12 +234,6 @@ public class RawModel {
         dos.writeInt(meshList.size());
         for (RawMesh mesh : meshList.values()) {
             mesh.serializeTo(dos);
-        }
-    }
-
-    public void setMatixProcess(Function<Matrix4f, Matrix4f> matrixProcess) {
-        for (RawMesh mesh : meshList.values()) {
-            mesh.setMatixProcess(matrixProcess);
         }
     }
 }

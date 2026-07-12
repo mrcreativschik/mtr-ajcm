@@ -139,9 +139,9 @@ public class AnimatedLoader {
                             case "refreshrate":
                                 buildingPart.refreshRateMillis = (int) (Float.parseFloat(value) * 1000F);
                                 break;
-                            //case "billboard":
+                            case "billboard":
                                 // extension
-                                //buildingPart.billboard = Integer.parseInt(value) != 0;
+                                buildingPart.billboard = Integer.parseInt(value) != 0;
                             default:
                                 Logging.LOGGER.warn("Unknown ANIMATED command in Object: " + tokens[0]);
                                 break;
