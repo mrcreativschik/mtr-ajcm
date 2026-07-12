@@ -68,70 +68,74 @@ configure(subprojects) {
 	assemble.finalizedBy(mergeJars)
 }
 
+// 1. Задача по скачиванию библиотек MTR 4
 task setupLibrary() {
+	String url = "https://aphrodite281.github.io/Minecraft-Transit-Railway-4.0.x/lib/" + minecraft_version + "/"
 
-	String url = "https://aphrodite281.github.io/Minecraft-Transit-Railway-3.x.x/lib/" + minecraft_version + "/"
+	doLast { // Меняем doFirst на doLast, чтобы скачивание происходило в момент выполнения задачи
+		// Создаем директорию, если её нет
+		file("checkouts/${minecraft_version}").mkdirs()
 
-	doFirst {
 		download {
 			src "${url}mtr-common.jar"
 			dest "checkouts/${minecraft_version}/mtr-common.jar"
-			// overwrite true
 		}
-
 		download {
 			src "${url}mtr-fabric.jar"
 			dest "checkouts/${minecraft_version}/mtr-fabric.jar"
-			// overwrite true
 		}
-
 		download {
 			src "${url}mtr-forge.jar"
 			dest "checkouts/${minecraft_version}/mtr-forge.jar"
-			// overwrite true
 		}
-		
 		download {
 			src "${url}files.zip"
 			dest "checkouts/${minecraft_version}/files.zip"
-			// overwrite true
 		}
 	}
 }
 
+// 2. Изолированная задача генерации маппингов (только латиница!)
+task codegenMappings() {
+    dependsOn setupLibrary
+
+    doLast {
+        if (!file("checkouts/${minecraft_version}/files.zip").exists()) {
+            throw new GradleException("Маппинги не найдены! Сначала запустите задачу setupLibrary.")
+        }
+
+        delete "fabric/src/main/java/cn/zbx1425/mtrsteamloco/mappings"
+        delete "forge/src/main/java/cn/zbx1425/mtrsteamloco/mappings"
+
+        copy {
+            from(zipTree("checkouts/${minecraft_version}/files.zip")) {
+                eachFile { file -> file.relativePath = new RelativePath(true, file.relativePath.segments.drop(1) as String[]) }
+            }
+            into "common/src/main/java/cn/zbx1425/mtrsteamloco/mappings"
+            filter(ReplaceTokens, tokens: ["package": "cn.zbx1425.mtrsteamloco.mappings; import mtr.mappings.*"])
+        }
+
+        ant.path { ant.fileset(dir: "common/src/main/java/cn/zbx1425/mtrsteamloco/mappings", includes: "Fabric*.java") }.list().each {
+            ant.move(file: it, todir: "fabric/src/main/java/cn/zbx1425/mtrsteamloco/mappings")
+        }
+
+        ant.path { ant.fileset(dir: "common/src/main/java/cn/zbx1425/mtrsteamloco/mappings", includes: "Forge*.java") }.list().each {
+            ant.move(file: it, todir: "forge/src/main/java/cn/zbx1425/mtrsteamloco/mappings")
+        }
+
+        ant.delete(dir: "common/src/main/java/cn/zbx1425/mtrsteamloco/mappings")
+    }
+}
+
+// 4. Жестко привязываем к компиляции (тоже исправил на латиницу)
+configure(subprojects) {
+    tasks.withType(JavaCompile) {
+        dependsOn rootProject.tasks.codegenMappings
+    }
+}
+// 3. Чистим сам блок build от генерации кода, оставляя только копирование модов в run/mods
 build {
-	doFirst {
-
-		copy {
-			// outputs.upToDateWhen { false }
-			from(zipTree("checkouts/${minecraft_version}/files.zip")) { eachFile { file -> file.relativePath = new RelativePath(true, file.relativePath.segments.drop(1) as String[]) } }
-			into "common/src/main/java/cn/zbx1425/mtrsteamloco/mappings"
-			filter(ReplaceTokens, tokens: ["package": "cn.zbx1425.mtrsteamloco.mappings; import mtr.mappings.*"])
-		}
-
-		ant.path { ant.fileset(dir: "common/src/main/java/cn/zbx1425/mtrsteamloco/mappings", includes: "Fabric*.java") }.list().each {
-			ant.move(file: it, todir: "fabric/src/main/java/cn/zbx1425/mtrsteamloco/mappings")
-		}
-
-		ant.path { ant.fileset(dir: "common/src/main/java/cn/zbx1425/mtrsteamloco/mappings", includes: "Forge*.java") }.list().each {
-			ant.move(file: it, todir: "forge/src/main/java/cn/zbx1425/mtrsteamloco/mappings")
-		}
-
-		ant.delete(dir: "common/src/main/java/cn/zbx1425/mtrsteamloco/mappings")
-		ant.delete(dir: "forge/build/libs")
-	}
-	copy {
-		outputs.upToDateWhen { false }
-		from "checkouts/${minecraft_version}/mtr-fabric.jar"
-		into "fabric/run/mods"
-	}
-
-	copy {
-		outputs.upToDateWhen { false }
-		from "checkouts/${minecraft_version}/mtr-forge.jar"
-		into "forge/run/mods"
-	}
-
+	// Переносим генерацию BuildConfigTemplate в правильное русло
 	copy {
 		outputs.upToDateWhen { false }
 		from "common/src/main/BuildConfigTemplate.java"
@@ -142,6 +146,25 @@ build {
 				"build_time": Instant.now().epochSecond.toString()
 		])
 		rename "(.+)Template.java", "\$1.java"
+	}
+
+	copy {
+		from "checkouts/${minecraft_version}/mtr-fabric.jar"
+		into "fabric/run/mods"
+	}
+
+	copy {
+		from "checkouts/${minecraft_version}/mtr-forge.jar"
+		into "forge/run/mods"
+	}
+
+	ant.delete(dir: "forge/build/libs")
+}
+
+// 4. ЖЕСТКО привязываем генерацию исходников ко всем задачам компиляции Java
+configure(subprojects) {
+	tasks.withType(JavaCompile) {
+		dependsOn rootProject.tasks.codegenMappings
 	}
 }
 
@@ -155,13 +178,17 @@ configure(allprojects) {
 	version = rootProject.mod_version + "+" + minecraft_version
 	group = project.maven_group
 
-	repositories {
-		maven { url = "https://maven.terraformersmc.com/" }
-		maven { url = "https://maven.parchmentmc.org/" }
-		maven { url "https://maven.shedaniel.me"}
-		maven { url "https://repo1.maven.org/maven2/" }
-		maven { url "https://nexus.velocitypowered.com/repository/maven-public/" }
-	}
+    repositories {
+        maven { url = "https://maven.terraformersmc.com/" }
+        maven { url = "https://maven.parchmentmc.org/" }
+        maven { url = "https://maven.shedaniel.me/" }
+        maven { url = "https://repo1.maven.org/maven2/" }
+
+        // Наши спасительные зеркала вместо упавшего Форджа:
+        maven { url = "https://repo.spongepowered.org/repository/maven-public/" }
+        maven { url = "https://modmaven.dev/" }
+        maven { url = "https://maven.blamejared.com/" }
+    }
 
 	tasks.withType(JavaCompile) {
 		options.encoding = "UTF-8"
@@ -202,36 +229,13 @@ forgix {
 	}
 }
 
-import org.gradle.api.internal.file.copy.CopyAction;
-import org.gradle.api.internal.file.copy.CopyActionProcessingStream;
-
-class DummyArchiveTask extends AbstractArchiveTask {
-
-	protected CopyAction createCopyAction() {
-		return new DummyCopyAction();
+configure(subprojects) {
+	tasks.withType(JavaCompile) {
+		dependsOn rootProject.tasks.named('codegenMappings')
 	}
-
-	class DummyCopyAction implements CopyAction {
-
-		@Override
-		WorkResult execute(CopyActionProcessingStream stream) {
-			return WorkResults.didWork(true);
-		}
-	}
-}
-
-tasks.register('dummyForgixOutput', DummyArchiveTask) {
-	// Forgix's mergeJars task doesn't extend AbstractArchiveTask.
-	// This is to make github.com/teaconmc/longjing happy.
-
-	destinationDirectory = file("build/")
-	archiveBaseName = "MTR-ANTE"
-	archiveVersion = rootProject.mod_version + "+" + minecraft_version
-	archiveExtension = "jar"
 }
 
 tasks.withType(JavaCompile) {
-    outputs.cacheIf { true }
-    options.incremental = true;
+	outputs.cacheIf { true }
+	options.incremental = true;
 }
-
