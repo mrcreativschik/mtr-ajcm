@@ -1,7 +1,7 @@
 dependencies {
 	modImplementation "net.fabricmc:fabric-loader:${rootProject.fabric_loader_version}"
 	modApi "${rootProject.architectury_id}:architectury:${rootProject.architectury_version}"
-
+	compileOnly project(path: ":fabric", configuration: "namedElements")
 	modApi("me.shedaniel.cloth:cloth-config:${rootProject.cloth_config_version}") { transitive = false }
 }
 
@@ -14,5 +14,5 @@ loom {
 	mixin {
 		defaultRefmapName = "mixins.mtrsteamloco.refmap.json"
 	}
-	accessWidenerPath = file("src/main/resources/mtrsteamloco.accesswidener")
+	//accessWidenerPath = file("src/main/resources/mtrsteamloco.accesswidener")
 }

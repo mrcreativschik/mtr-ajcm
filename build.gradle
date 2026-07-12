@@ -40,12 +40,20 @@ configure(subprojects) {
 		compileOnly("me.shedaniel.cloth:basic-math:+")
 		annotationProcessor 'systems.manifold:manifold-preprocessor:+'
 		minecraft "com.mojang:minecraft:${minecraft_version}"
+
 		mappings parchment_version == "" ? loom.officialMojangMappings() : loom.layered() {
 			officialMojangMappings()
 			parchment("org.parchmentmc.data:parchment-${minecraft_version}:${parchment_version}@zip")
 		}
-		implementation files("../checkouts/${minecraft_version}/mtr-common.jar")
+
+		// Вместо старого implementation files(...) пишем нормальный мавен:
+		modImplementation "maven.modrinth:minecraft-transit-railway:FABRIC-4.0.5+1.20.1" // Тут вместо "ниже" укажи версию, которая лежит на мавене, например 4.0.0-beta-8
+		compileOnly "maven.modrinth:minecraft-transit-railway:FABRIC-4.0.5+1.20.1"
+		modImplementation "maven.modrinth:jcm:v2.2.3+1.20.1"
+		compileOnly "maven.modrinth:jcm:v2.2.3+1.20.1"
+		//modImplementation "mtr:mtr-fabric:4.0.5"
 		implementation "org.msgpack:msgpack-core:${rootProject.messagepack_version}"
+		// ... дальше твои graaljs зависимости ...
 
 		compileOnly("org.graalvm.polyglot:polyglot:${graaljsVersion}")
 		compileOnly("org.graalvm.polyglot:js:${graaljsVersion}")
@@ -70,9 +78,9 @@ configure(subprojects) {
 
 // 1. Задача по скачиванию библиотек MTR 4
 task setupLibrary() {
-	String url = "https://aphrodite281.github.io/Minecraft-Transit-Railway-4.0.x/lib/" + minecraft_version + "/"
+	//String url = "https://aphrodite281.github.io/Minecraft-Transit-Railway-4.0.x/lib/" + minecraft_version + "/"
 
-	doLast { // Меняем doFirst на doLast, чтобы скачивание происходило в момент выполнения задачи
+	/*doLast { // Меняем doFirst на doLast, чтобы скачивание происходило в момент выполнения задачи
 		// Создаем директорию, если её нет
 		file("checkouts/${minecraft_version}").mkdirs()
 
@@ -91,151 +99,109 @@ task setupLibrary() {
 		download {
 			src "${url}files.zip"
 			dest "checkouts/${minecraft_version}/files.zip"
+		}*/
+	}
+
+// 2. Изолированная задача генерации маппингов (только латиница!)
+// Оставляем только одну таску для генерации
+task codegenMappings() {
+	outputs.dir("fabric/src/main/java/cn/zbx1425/mtrsteamloco/mappings")
+	doLast {
+		def mappingsDir = file("common/src/main/java/cn/zbx1425/mtrsteamloco/mappings")
+
+		if (!file("fabric/src/main/java/cn/zbx1425/mtrsteamloco/mappings").exists()) {
+			copy {
+				from(zipTree("checkouts/${minecraft_version}/files.zip")) {
+					eachFile { file -> file.relativePath = new RelativePath(true, file.relativePath.segments.drop(1) as String[]) }
+				}
+				into mappingsDir
+				filter(ReplaceTokens, tokens: ["package": "cn.zbx1425.mtrsteamloco.mappings; import mtr.mappings.*"])
+			}
+
+			ant.path { ant.fileset(dir: mappingsDir.absolutePath, includes: "Fabric*.java") }.list().each {
+				ant.move(file: it, todir: "fabric/src/main/java/cn/zbx1425/mtrsteamloco/mappings")
+			}
+			ant.delete(dir: mappingsDir.absolutePath)
 		}
 	}
 }
 
-// 2. Изолированная задача генерации маппингов (только латиница!)
-task codegenMappings() {
-    dependsOn setupLibrary
-
-    doLast {
-        if (!file("checkouts/${minecraft_version}/files.zip").exists()) {
-            throw new GradleException("Маппинги не найдены! Сначала запустите задачу setupLibrary.")
-        }
-
-        delete "fabric/src/main/java/cn/zbx1425/mtrsteamloco/mappings"
-        delete "forge/src/main/java/cn/zbx1425/mtrsteamloco/mappings"
-
-        copy {
-            from(zipTree("checkouts/${minecraft_version}/files.zip")) {
-                eachFile { file -> file.relativePath = new RelativePath(true, file.relativePath.segments.drop(1) as String[]) }
-            }
-            into "common/src/main/java/cn/zbx1425/mtrsteamloco/mappings"
-            filter(ReplaceTokens, tokens: ["package": "cn.zbx1425.mtrsteamloco.mappings; import mtr.mappings.*"])
-        }
-
-        ant.path { ant.fileset(dir: "common/src/main/java/cn/zbx1425/mtrsteamloco/mappings", includes: "Fabric*.java") }.list().each {
-            ant.move(file: it, todir: "fabric/src/main/java/cn/zbx1425/mtrsteamloco/mappings")
-        }
-
-        ant.path { ant.fileset(dir: "common/src/main/java/cn/zbx1425/mtrsteamloco/mappings", includes: "Forge*.java") }.list().each {
-            ant.move(file: it, todir: "forge/src/main/java/cn/zbx1425/mtrsteamloco/mappings")
-        }
-
-        ant.delete(dir: "common/src/main/java/cn/zbx1425/mtrsteamloco/mappings")
-    }
-}
+// Привязываем компиляцию ОДИН РАЗ
 
 // 4. Жестко привязываем к компиляции (тоже исправил на латиницу)
-configure(subprojects) {
-    tasks.withType(JavaCompile) {
-        dependsOn rootProject.tasks.codegenMappings
-    }
-}
-// 3. Чистим сам блок build от генерации кода, оставляя только копирование модов в run/mods
-build {
-	// Переносим генерацию BuildConfigTemplate в правильное русло
-	copy {
-		outputs.upToDateWhen { false }
-		from "common/src/main/BuildConfigTemplate.java"
-		into "common/src/main/java/cn/zbx1425/mtrsteamloco"
-		filter(ReplaceTokens, tokens: [
-				"version": rootProject.mod_version + "+" + minecraft_version,
-				"protocol_version": rootProject.mod_protocol_version,
-				"build_time": Instant.now().epochSecond.toString()
-		])
-		rename "(.+)Template.java", "\$1.java"
-	}
 
-	copy {
-		from "checkouts/${minecraft_version}/mtr-fabric.jar"
-		into "fabric/run/mods"
-	}
-
-	copy {
-		from "checkouts/${minecraft_version}/mtr-forge.jar"
-		into "forge/run/mods"
-	}
-
-	ant.delete(dir: "forge/build/libs")
-}
 
 // 4. ЖЕСТКО привязываем генерацию исходников ко всем задачам компиляции Java
-configure(subprojects) {
-	tasks.withType(JavaCompile) {
-		dependsOn rootProject.tasks.codegenMappings
-	}
-}
 
 tasks.named('build') {
-    mustRunAfter 'setupLibrary'  // 强制顺序
+mustRunAfter 'setupLibrary'  // 强制顺序
 }
 
 configure(allprojects) {
-	apply plugin: "architectury-plugin"
+apply plugin: "architectury-plugin"
 
-	version = rootProject.mod_version + "+" + minecraft_version
-	group = project.maven_group
+version = rootProject.mod_version + "+" + minecraft_version
+group = project.maven_group
 
-    repositories {
-        maven { url = "https://maven.terraformersmc.com/" }
-        maven { url = "https://maven.parchmentmc.org/" }
-        maven { url = "https://maven.shedaniel.me/" }
-        maven { url = "https://repo1.maven.org/maven2/" }
-
-        // Наши спасительные зеркала вместо упавшего Форджа:
-        maven { url = "https://repo.spongepowered.org/repository/maven-public/" }
-        maven { url = "https://modmaven.dev/" }
-        maven { url = "https://maven.blamejared.com/" }
-    }
-
-	tasks.withType(JavaCompile) {
-		options.encoding = "UTF-8"
-    	options.incremental = true;
-		
-
-		if (minecraft_main_version == 16) {
-			def targetVersion = 8
-			if (JavaVersion.current().isJava9Compatible()) {
-				options.release.set(targetVersion)
-			}
-		} else if (minecraft_main_version == 17) {
-			options.release.set(16)
-		} else {
-			options.release.set(17)
-		}
-
-        options.compilerArgs += ['-Xplugin:Manifold', '-AMC_VERSION=' + minecraft_version_int]
-		if (project.hasProperty("debug") && project.property('debug').toBoolean()) {
-			options.compilerArgs += ['-ADEBUG=true']
-		}
-	}
-}
-
-forgix {
-	group = "cn.zbx1425"
-	mergedJarName = "MTR-ANTE" + "-" + rootProject.mod_version + "+" + minecraft_version + ".jar"
-	outputDir = "build/"
-
-	forge {
-		projectName = "forge"
-		jarLocation = "build/libs/forge" + "-" + rootProject.mod_version + "+" + minecraft_version + ".jar"
-	}
-
-	fabric {
-		projectName = "fabric"
-		jarLocation = "build/libs/fabric" + "-" + rootProject.mod_version + "+" + minecraft_version + ".jar"
-	}
-}
-
-configure(subprojects) {
-	tasks.withType(JavaCompile) {
-		dependsOn rootProject.tasks.named('codegenMappings')
-	}
+repositories {
+maven { url = "https://maven.terraformersmc.com/" }
+maven { url = "https://maven.parchmentmc.org/" }
+maven { url = "https://maven.shedaniel.me/" }
+maven { url = "https://repo1.maven.org/maven2/" }
+maven { url = "https://repo.spongepowered.org/repository/maven-public/" }
+maven { url = "https://modmaven.dev/" }
+maven { url = "https://maven.blamejared.com/" }
+	mavenCentral()
+	maven { url = "https://api.modrinth.com/maven" }
+	maven { url = "https://jitpack.io" }
 }
 
 tasks.withType(JavaCompile) {
-	outputs.cacheIf { true }
-	options.incremental = true;
+options.encoding = "UTF-8"
+options.incremental = true;
+
+
+if (minecraft_main_version == 16) {
+    def targetVersion = 8
+    if (JavaVersion.current().isJava9Compatible()) {
+        options.release.set(targetVersion)
+    }
+} else if (minecraft_main_version == 17) {
+    options.release.set(16)
+} else {
+    options.release.set(17)
+}
+
+options.compilerArgs += ['-Xplugin:Manifold', '-AMC_VERSION=' + minecraft_version_int]
+if (project.hasProperty("debug") && project.property('debug').toBoolean()) {
+    options.compilerArgs += ['-ADEBUG=true']
+}
+}
+}
+
+forgix {
+group = "cn.zbx1425"
+mergedJarName = "MTR-ANTE" + "-" + rootProject.mod_version + "+" + minecraft_version + ".jar"
+outputDir = "build/"
+
+forge {
+projectName = "forge"
+jarLocation = "build/libs/forge" + "-" + rootProject.mod_version + "+" + minecraft_version + ".jar"
+}
+
+fabric {
+projectName = "fabric"
+jarLocation = "build/libs/fabric" + "-" + rootProject.mod_version + "+" + minecraft_version + ".jar"
+}
+}
+
+configure(subprojects) {
+tasks.withType(JavaCompile) {
+dependsOn rootProject.tasks.named('codegenMappings')
+}
+}
+
+tasks.withType(JavaCompile) {
+outputs.cacheIf { true }
+options.incremental = true;
 }

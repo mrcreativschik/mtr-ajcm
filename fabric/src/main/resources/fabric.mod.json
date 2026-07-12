@@ -33,6 +33,5 @@
 		"fabric": "*",
 		"minecraft": "${minecraft_version}",
 		"mtr": ">=${mtr_min_version}"
-	},
-	"accessWidener" : "mtrsteamloco_filtered.accesswidener"
+	}
 }

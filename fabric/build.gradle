@@ -12,13 +12,14 @@ repositories {
 		name = "TerraformersMC"
 		url = uri("https://maven.terraformersmc.com/releases")
 	}
+	maven { url = "https://api.modrinth.com/maven" }
 }
 
 loom {
 	mixin {
 		defaultRefmapName = "mixins.mtrsteamloco_fabric.refmap.json"
 	}
-	accessWidenerPath = project(":common").loom.accessWidenerPath
+	//accessWidenerPath = file("src/main/resources/mtrsteamloco.accesswidener")
 }
 
 configurations {
@@ -33,17 +34,18 @@ configurations {
 dependencies {
 	modImplementation "net.fabricmc:fabric-loader:${rootProject.fabric_loader_version}"
 	modApi "net.fabricmc.fabric-api:fabric-api:${rootProject.fabric_api_version}"
-	implementation files("../checkouts/${minecraft_version}/mtr-fabric.jar")
+	implementation files("../checkouts/${minecraft_version}/mtr-common.jar")
 
 	modApi("com.terraformersmc:modmenu:${rootProject.ext.mod_menu_version}") { transitive false }
-
-	common(project(path: ":common", configuration: "namedElements")) { transitive false }
-	shadowCommon(project(path: ":common", configuration: "transformProductionFabric")) { transitive false }
 
 	modApi("me.shedaniel.cloth:cloth-config-fabric:${rootProject.cloth_config_version}") { transitive false }
 	modApi("me.shedaniel.cloth:basic-math:0.6.1") { transitive false }
 	clothConfigJar("me.shedaniel.cloth:cloth-config-fabric:${rootProject.cloth_config_version}") { transitive false }
 	clothConfigJar("me.shedaniel.cloth:basic-math:0.6.1") { transitive false }
+	// Твои стандартные зависимости fabric (loader, fabric-api, common project)
+	// Сюда пихаем MTR и JCM, которые с Modrinth
+	modImplementation "maven.modrinth:minecraft-transit-railway:FABRIC-4.0.5+1.20.1"
+	modImplementation "maven.modrinth:jcm:v2.2.3+1.20.1"
 }
 
 processResources {
